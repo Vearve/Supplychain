@@ -1,0 +1,246 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Inventory Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { margin:0; font-family: 'Segoe UI', Arial, sans-serif; background: #f4f6fa; color: #222; }
+        .navbar {
+            background: #fff; box-shadow: 0 2px 8px #0001; padding: 0 32px; height: 56px;
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .navbar .logo { font-weight: bold; font-size: 1.2em; color: #4b3fa7; }
+        .navbar .user-info { font-size: 0.98em; }
+        .navbar .logout { color: #dc3545; text-decoration: none; margin-left: 16px; }
+        .dashboard { display: flex; }
+        .sidebar {
+            width: 220px; background: #fff; min-height: 100vh; box-shadow: 2px 0 8px #0001;
+            padding: 24px 16px 16px 16px; display: flex; flex-direction: column; gap: 24px;
+        }
+        .sidebar label { font-weight: bold; margin-top: 12px; display: block; }
+        .sidebar select, .sidebar input { width: 100%; margin-top: 4px; margin-bottom: 12px; padding: 6px; border-radius: 5px; border: 1px solid #ccc; }
+        .sidebar .info { font-size: 0.95em; color: #555; background: #f8f9fa; padding: 10px; border-radius: 8px; }
+        .main-content { flex: 1; padding: 32px; }
+        .summary-cards { display: flex; gap: 24px; margin-bottom: 32px; flex-wrap: wrap; }
+        .card {
+            background: #fff; border-radius: 12px; box-shadow: 0 2px 8px #0001;
+            padding: 24px 18px; min-width: 160px; flex: 1 1 160px; text-align: center;
+        }
+        .card-title { font-size: 1em; color: #888; }
+        .card-value { font-size: 2em; font-weight: bold; color: #4b3fa7; }
+        .charts-row { display: flex; gap: 24px; margin-bottom: 32px; flex-wrap: wrap; }
+        .chart-box {
+            background: #fff; border-radius: 12px; box-shadow: 0 2px 8px #0001;
+            padding: 18px; flex: 1 1 340px; min-width: 320px; text-align: center;
+        }
+        .chart-box canvas { background: #f8f9fa; border-radius: 8px; }
+        .data-tables { display: flex; gap: 24px; flex-wrap: wrap; }
+        .table-box {
+            background: #fff; border-radius: 12px; box-shadow: 0 2px 8px #0001;
+            padding: 18px; flex: 1 1 340px; min-width: 320px; overflow-x: auto;
+        }
+        table { width: 100%; border-collapse: collapse; font-size: 0.98em; }
+        th, td { padding: 8px 6px; border-bottom: 1px solid #eee; }
+        th { background: #f4f6fa; color: #4b3fa7; }
+        .admin-btn {
+            display: inline-block; background: #28a745; color: #fff; padding: 10px 20px;
+            border-radius: 8px; text-decoration: none; font-weight: bold; margin: 16px 0;
+        }
+        .admin-btn:hover { background: #218838; }
+    </style>
+</head>
+<body>
+    <div class="navbar" style="background:#fff; box-shadow:0 2px 8px #0001; padding:0 32px; height:56px; display:flex; align-items:center; justify-content:space-between;">
+        <span class="logo" style="display:flex; align-items:center; font-size:1.1em; font-weight:500; letter-spacing:0.5px;">
+            <svg style="width:24px;height:24px;margin-right:7px;vertical-align:middle;" viewBox="0 0 24 24">
+                <path fill="#888" d="M3,13H5V11H3V13M7,13H9V11H7V13M11,13H13V11H11V13M17,13H19V11H17V13M21,13V11C21,9.9 20.1,9 19,9H5C3.9,9 3,9.9 3,11V13C3,14.1 3.9,15 5,15H19C20.1,15 21,14.1 21,13Z" />
+            </svg>
+            <span style="color:#888;font-family:'Segoe UI',Arial,sans-serif;font-weight:500;">Leo's Supplychain Overview</span>
+        </span>
+        <a href="/admin/" style="display:flex;align-items:center;color:#888;font-weight:500;text-decoration:none;font-size:1em;transition:color 0.2s;">
+            <svg style="width:18px;height:18px;margin-right:5px;vertical-align:middle;" viewBox="0 0 24 24">
+                <path fill="#888" d="M10.09,15.59L8.67,17L13.67,22L18.67,17L17.25,15.59L14,18.83V4H12V18.83L10.09,15.59Z" />
+            </svg>
+            <span style="font-size:1em;">Login to Admin</span>
+        </a>
+        <style>
+            .navbar a:hover { color: #4b3fa7 !important; }
+            .navbar a:hover svg path { fill: #4b3fa7 !important; }
+            .navbar .logo span { font-size: 1.08em; }
+        </style>
+    </div>
+    <div class="dashboard">
+        <aside class="sidebar">
+            <form method="get">
+                <label for="category">Category</label>
+                <select id="category" name="category">
+                    <option value="">All</option>
+                    {% for cat in category_choices %}
+                        <option value="{{ cat.id }}">{{ cat.name }}</option>
+                    {% endfor %}
+                </select>
+                <label for="department">Department</label>
+                <select id="department" name="department">
+                    <option value="">All</option>
+                    {% for value, name in department_choices %}
+                        <option value="{{ value }}">{{ name }}</option>
+                    {% endfor %}
+                </select>
+                <label for="daterange">Date Range</label>
+                <input type="date" id="daterange" name="daterange" placeholder="dd/mm/yyyy">
+                <button type="submit" class="admin-btn" style="width:100%;margin:10px 0 0 0;">Filter</button>
+            </form>
+            <div class="info">
+                <b>Need more data?</b><br>
+                Contact <a href="mailto:hr,lumwana@leosinvestments.com">hr.lumwana@leosinvestments.com</a>
+            </div>
+        </aside>
+        <main class="main-content">
+            <div class="summary-cards">
+                <div class="card">
+                    <div class="card-title">Total Materials</div>
+                    <div class="card-value">{{ total_materials }}</div>
+                </div>
+                <div class="card">
+                    <div class="card-title">Low Stock Items</div>
+                    <div class="card-value">{{ low_stock_count }}</div>
+                </div>
+                <div class="card">
+                    <div class="card-title">Total Categories</div>
+                    <div class="card-value">{{ total_categories }}</div>
+                </div>
+                <div class="card">
+                    <div class="card-title">Total Requisitions</div>
+                    <div class="card-value">{{ total_requisitions }}</div>
+                </div>
+                <div class="card">
+                    <div class="card-title">Pending Requisitions</div>
+                    <div class="card-value">{{ pending_requisitions }}</div>
+                </div>
+                <div class="card">
+                    <div class="card-title">Total Stock Transactions</div>
+                    <div class="card-value">{{ total_transactions }}</div>
+                </div>
+                <div class="card">
+                    <div class="card-title">Total Quantity in Stock</div>
+                    <div class="card-value">{{ total_quantity }}</div>
+                </div>
+            </div>
+            <div class="charts-row">
+                <div class="chart-box">
+                    <h3>Materials by Category</h3>
+                    <canvas id="categoryChart" height="180"></canvas>
+                </div>
+                <div class="chart-box">
+                    <h3>Stock Transactions by Type</h3>
+                    <canvas id="transactionChart" height="180"></canvas>
+                </div>
+                <div class="chart-box">
+                    <h3>Requisitions by Department</h3>
+                    <canvas id="requisitionChart" height="180"></canvas>
+                </div>
+                <div class="chart-box">
+                    <h3>Material Quantity Distribution</h3>
+                    <canvas id="materialPieChart" height="180"></canvas>
+                </div>
+            </div>
+            <div class="data-tables">
+                <div class="table-box">
+                    <h4>Recent Stock Transactions</h4>
+                    <table>
+                        <tr>
+                            <th>Date</th><th>Material</th><th>Type</th><th>Qty</th><th>User</th>
+                        </tr>
+                        {% for t in recent_transactions %}
+                        <tr>
+                            <td>{{ t.date }}</td>
+                            <td>{{ t.material }}</td>
+                            <td>{{ t.transaction_type }}</td>
+                            <td>{{ t.quantity }}</td>
+                            <td>{{ t.user }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="5">No recent transactions.</td></tr>
+                        {% endfor %}
+                    </table>
+                </div>
+                <div class="table-box">
+                    <h4>Low Stock Details</h4>
+                    <table>
+                        <tr>
+                            <th>Material</th><th>Qty</th><th>Min Required</th>
+                        </tr>
+                        {% for item in low_stock %}
+                        <tr>
+                            <td>{{ item.name }}</td>
+                            <td>{{ item.quantity }}</td>
+                            <td>{{ item.min_required }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="3">All items are well stocked.</td></tr>
+                        {% endfor %}
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+    <script>
+        // Chart Data from Django context
+        const categoryData = JSON.parse('{{ category_counts_json|escapejs }}');
+        const transactionData = JSON.parse('{{ transaction_counts_json|escapejs }}');
+        const requisitionData = JSON.parse('{{ requisition_counts_json|escapejs }}');
+        const materialData = JSON.parse('{{ material_counts_json|escapejs }}');
+
+        // Materials by Category - Bar
+        new Chart(document.getElementById('categoryChart'), {
+            type: 'bar',
+            data: {
+                labels: categoryData.map(c => c.name),
+                datasets: [{
+                    label: 'Items',
+                    data: categoryData.map(c => c.material_count),
+                    backgroundColor: '#4b3fa7'
+                }]
+            }
+        });
+
+        // Stock Transactions by Type - Pie
+        new Chart(document.getElementById('transactionChart'), {
+            type: 'pie',
+            data: {
+                labels: transactionData.map(t => t.transaction_type),
+                datasets: [{
+                    data: transactionData.map(t => t.count),
+                    backgroundColor: ['#28a745', '#dc3545', '#ffc107', '#007bff']
+                }]
+            }
+        });
+
+        // Requisitions by Department - Doughnut
+        new Chart(document.getElementById('requisitionChart'), {
+            type: 'doughnut',
+            data: {
+                labels: requisitionData.map(r => r.department),
+                datasets: [{
+                    data: requisitionData.map(r => r.count),
+                    backgroundColor: ['#007bff', '#ffc107', '#dc3545', '#17a2b8', '#6f42c1']
+                }]
+            }
+        });
+
+        // Material Quantity Distribution - Pie
+        new Chart(document.getElementById('materialPieChart'), {
+            type: 'pie',
+            data: {
+                labels: materialData.map(m => m.name),
+                datasets: [{
+                    data: materialData.map(m => m.quantity),
+                    backgroundColor: materialData.map(() => `hsl(${Math.random() * 360}, 70%, 60%)`)
+                }]
+            }
+        });
+    </script>
+</body>
+</html>
