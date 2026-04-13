@@ -1,0 +1,179 @@
+{% extends 'SupplChain_MNG/workspace_base.html' %}
+
+{% block title %}Analytics{% endblock %}
+{% block page_title %}Analytics{% endblock %}
+
+{% block head_extra %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% endblock %}
+
+{% block content %}
+<section class="cards" style="margin-bottom: 12px;">
+    <article class="metric"><div class="label">Total Stock In</div><div class="value">{{ total_in }}</div></article>
+    <article class="metric"><div class="label">Total Stock Out</div><div class="value">{{ total_out }}</div></article>
+    <article class="metric"><div class="label">Total Returned</div><div class="value">{{ return_volume }}</div></article>
+    <article class="metric"><div class="label">Fulfillment Rate</div><div class="value">{{ fulfillment_rate }}%</div></article>
+</section>
+
+<div class="panel panel-pad" style="margin-bottom: 12px; display: flex; gap: 8px; flex-wrap: wrap;">
+    <a class="btn btn-neutral" href="{% url 'export_records' 'materials' 'excel' %}?{{ request.GET.urlencode }}">Materials Excel</a>
+    <a class="btn btn-neutral" href="{% url 'export_records' 'requisitions' 'excel' %}?{{ request.GET.urlencode }}">Requisitions Excel</a>
+    <a class="btn btn-neutral" href="{% url 'export_records' 'stock-transactions' 'csv' %}?{{ request.GET.urlencode }}">Transactions CSV</a>
+    <a class="btn btn-neutral" href="{% url 'export_records' 'mobile-equipment' 'excel' %}">Fleet Excel</a>
+</div>
+
+<section class="split" style="margin-bottom: 12px;">
+    <div class="panel panel-pad">
+        <h3 style="margin-top: 0;">Top Materials by Quantity</h3>
+        <canvas id="topMaterialChart" height="140"></canvas>
+    </div>
+    <div class="panel panel-pad">
+        <h3 style="margin-top: 0;">Top Requested Materials</h3>
+        <canvas id="topRequestedChart" height="140"></canvas>
+    </div>
+</section>
+
+<section class="panel panel-pad">
+    <h3 style="margin-top: 0;">Stock In vs Stock Out Volume</h3>
+    <canvas id="splitChart" height="110"></canvas>
+</section>
+
+<section class="split" style="margin-top: 12px; margin-bottom: 12px;">
+    <div class="panel panel-pad">
+        <h3 style="margin-top: 0;">Fleet Status Mix</h3>
+        <canvas id="fleetStatusChart" height="130"></canvas>
+    </div>
+    <div class="panel panel-pad">
+        <h3 style="margin-top: 0;">Fleet Compliance Due in 30 Days</h3>
+        <canvas id="fleetDueChart" height="130"></canvas>
+    </div>
+</section>
+
+<section class="panel panel-pad">
+    <h3 style="margin-top: 0;">Fuel / Oil / Grease Consumption</h3>
+    <canvas id="fuelMixChart" height="95"></canvas>
+</section>
+
+<section class="split" style="margin-top: 12px; margin-bottom: 12px;">
+    <div class="panel panel-pad">
+        <h3 style="margin-top: 0;">Equipment Status Mix</h3>
+        <canvas id="equipmentStatusChart" height="130"></canvas>
+    </div>
+    <div class="panel panel-pad">
+        <h3 style="margin-top: 0;">Monthly Fuel Usage Trend</h3>
+        <canvas id="fuelTrendChart" height="130"></canvas>
+    </div>
+</section>
+
+<section class="panel panel-pad">
+    <h3 style="margin-top: 0;">Monthly Maintenance Cost Trend</h3>
+    <canvas id="maintenanceTrendChart" height="95"></canvas>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const topMaterials = JSON.parse('{{ top_materials_json|escapejs }}');
+    const topRequested = JSON.parse('{{ top_requested_json|escapejs }}');
+    const splitData = JSON.parse('{{ transaction_split_json|escapejs }}');
+    const fleetStatus = JSON.parse('{{ fleet_status_json|escapejs }}');
+    const equipmentStatus = JSON.parse('{{ equipment_status_json|escapejs }}');
+    const dueSummary = JSON.parse('{{ due_summary_json|escapejs }}');
+    const fuelMix = JSON.parse('{{ fuel_by_type_json|escapejs }}');
+    const fuelTrend = JSON.parse('{{ fuel_trend_json|escapejs }}');
+    const maintenanceTrend = JSON.parse('{{ maintenance_cost_trend_json|escapejs }}');
+
+    const polished = {
+        responsive: true,
+        plugins: {
+            legend: { labels: { color: '#244355', boxWidth: 14 } },
+            tooltip: { cornerRadius: 8, backgroundColor: '#12384a' }
+        },
+        scales: {
+            x: { ticks: { color: '#355c7d' }, grid: { color: '#e8eff4' } },
+            y: { ticks: { color: '#355c7d' }, grid: { color: '#e8eff4' } }
+        }
+    };
+
+    new Chart(document.getElementById('topMaterialChart'), {
+        type: 'bar',
+        data: {
+            labels: topMaterials.map(x => x.name),
+            datasets: [{ label: 'Quantity in stock', data: topMaterials.map(x => x.total), backgroundColor: '#2f6f8e', borderRadius: 8 }]
+        },
+        options: polished
+    });
+
+    new Chart(document.getElementById('topRequestedChart'), {
+        type: 'bar',
+        data: {
+            labels: topRequested.map(x => x.material__name || 'Unknown'),
+            datasets: [{ label: 'Requested Quantity', data: topRequested.map(x => x.total), backgroundColor: '#1f8a70', borderRadius: 8 }]
+        },
+        options: polished
+    });
+
+    new Chart(document.getElementById('splitChart'), {
+        type: 'doughnut',
+        data: {
+            labels: splitData.map(x => x.transaction_type),
+            datasets: [{ data: splitData.map(x => x.total), backgroundColor: ['#177f63', '#b21f35'] }]
+        },
+        options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+    });
+
+    new Chart(document.getElementById('fleetStatusChart'), {
+        type: 'pie',
+        data: {
+            labels: fleetStatus.map(x => x.status),
+            datasets: [{ data: fleetStatus.map(x => x.total), backgroundColor: ['#2f6f8e', '#b21f35', '#b86b00', '#177f63', '#7b8794'] }]
+        },
+        options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+    });
+
+    new Chart(document.getElementById('fleetDueChart'), {
+        type: 'bar',
+        data: {
+            labels: dueSummary.map(x => x.label),
+            datasets: [{ label: 'Due soon', data: dueSummary.map(x => x.count), backgroundColor: '#355c7d', borderRadius: 8 }]
+        },
+        options: polished
+    });
+
+    new Chart(document.getElementById('fuelMixChart'), {
+        type: 'bar',
+        data: {
+            labels: fuelMix.map(x => x.fluid_type),
+            datasets: [{ label: 'Volume Used', data: fuelMix.map(x => x.total), backgroundColor: ['#1f8a70', '#2f6f8e', '#a76f00'], borderRadius: 8 }]
+        },
+        options: polished
+    });
+
+    new Chart(document.getElementById('equipmentStatusChart'), {
+        type: 'pie',
+        data: {
+            labels: equipmentStatus.map(x => x.status),
+            datasets: [{ data: equipmentStatus.map(x => x.total), backgroundColor: ['#2f6f8e', '#1f8a70', '#b86b00', '#b21f35', '#7b8794'] }]
+        },
+        options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+    });
+
+    new Chart(document.getElementById('fuelTrendChart'), {
+        type: 'line',
+        data: {
+            labels: fuelTrend.map(x => x.month),
+            datasets: [{ label: 'Fuel volume', data: fuelTrend.map(x => x.total), borderColor: '#2f6f8e', backgroundColor: '#2f6f8e22', fill: true, tension: 0.35 }]
+        },
+        options: polished
+    });
+
+    new Chart(document.getElementById('maintenanceTrendChart'), {
+        type: 'line',
+        data: {
+            labels: maintenanceTrend.map(x => x.month),
+            datasets: [{ label: 'Maintenance cost', data: maintenanceTrend.map(x => x.total), borderColor: '#b21f35', backgroundColor: '#b21f3522', fill: true, tension: 0.35 }]
+        },
+        options: polished
+    });
+</script>
+{% endblock %}

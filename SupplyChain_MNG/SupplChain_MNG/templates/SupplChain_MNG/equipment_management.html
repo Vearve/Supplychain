@@ -1,0 +1,68 @@
+{% extends 'SupplChain_MNG/workspace_base.html' %}
+
+{% block title %}Equipment Management{% endblock %}
+{% block page_title %}Equipment Management{% endblock %}
+
+{% block content %}
+<section class="cards" style="margin-bottom: 12px;">
+    <article class="metric"><div class="label">Active Equipment</div><div class="value">{{ active_equipment_count }}</div></article>
+    <article class="metric"><div class="label">In Maintenance</div><div class="value">{{ maintenance_equipment_count }}</div></article>
+    <article class="metric"><div class="label">Broken</div><div class="value">{{ broken_equipment_count }}</div></article>
+</section>
+
+<div class="panel panel-pad" style="margin-bottom: 12px; display: flex; gap: 8px; flex-wrap: wrap;">
+    {% if can_manage_current %}
+    <a class="btn btn-primary" href="{% url 'record_create' 'equipment' %}">Add Equipment</a>
+    {% endif %}
+    <a class="btn btn-neutral" href="{% url 'export_records' 'equipment' 'csv' %}?{{ request.GET.urlencode }}">Export CSV</a>
+    <a class="btn btn-neutral" href="{% url 'export_records' 'equipment' 'excel' %}?{{ request.GET.urlencode }}">Export Excel</a>
+</div>
+
+<div class="panel panel-pad table-wrap">
+    <table>
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Serial Number</th>
+                <th>Category</th>
+                <th>Subcategory</th>
+                <th>Project/Site</th>
+                <th>Linked Store</th>
+                <th>Location</th>
+                <th>Status</th>
+                <th>Purchase Date</th>
+                <th>Service Due</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in rows %}
+            <tr>
+                <td><a href="{% url 'equipment_detail' item.id %}">{{ item.name }}</a></td>
+                <td>{{ item.serial_number|default:'-' }}</td>
+                <td>{{ item.subcategory.category.name|default:'-' }}</td>
+                <td>{{ item.subcategory.name|default:'-' }}</td>
+                <td>{{ item.project.name|default:'-' }}</td>
+                <td>{{ item.store_location.name|default:'-' }}</td>
+                <td>{{ item.location|default:'-' }}</td>
+                <td>{{ item.get_status_display }}</td>
+                <td>{{ item.purchase_date|date:'Y-m-d'|default:'-' }}</td>
+                <td>
+                    {{ item.service_due_date|date:'Y-m-d'|default:'-' }}
+                    <div><span class="badge {{ item.service_due_meta.class_name }}">{{ item.service_due_meta.label }}</span></div>
+                </td>
+                <td>
+                    <a class="btn btn-neutral btn-sm" href="{% url 'equipment_detail' item.id %}">View</a>
+                    {% if can_manage_current %}
+                    <a class="btn btn-neutral btn-sm" href="{% url 'record_update' 'equipment' item.id %}">Edit</a>
+                    <a class="btn btn-danger btn-sm" href="{% url 'record_delete' 'equipment' item.id %}">Delete</a>
+                    {% endif %}
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="11">No equipment records found.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

@@ -1,0 +1,55 @@
+{% extends 'SupplChain_MNG/workspace_base.html' %}
+
+{% block title %}{{ title }}{% endblock %}
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="panel panel-pad" style="max-width: 980px; margin-bottom: 12px;">
+    <form method="post" id="goods-returns-form">
+        {% csrf_token %}
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+            {% for field in form %}
+            {% if field.name == 'notes' %}
+            <div style="grid-column:1 / -1;">
+            {% else %}
+            <div>
+            {% endif %}
+                <label style="font-size:0.9rem; font-weight:600; display:block; margin-bottom:4px;">{{ field.label }}</label>
+                {{ field }}
+                {% for error in field.errors %}<div style="color:#b21f35; font-size:0.85rem;">{{ error }}</div>{% endfor %}
+            </div>
+            {% endfor %}
+        </div>
+
+        <hr style="margin:16px 0; border:none; border-top:1px solid #d4dfe7;">
+        <h3 style="margin-top:0;">Items</h3>
+
+        {{ formset.management_form }}
+        <table style="width:100%; border-collapse:collapse; margin-bottom:10px;" id="items-table">
+            <thead>
+                <tr><th style="text-align:left;">Issue Line (optional)</th><th style="text-align:left;">Material</th><th style="text-align:left;">Quantity</th><th style="text-align:left;">Condition</th><th style="text-align:left;">Notes</th><th style="text-align:left;">Delete</th></tr>
+            </thead>
+            <tbody>
+                {% for item_form in formset %}
+                <tr class="item-row">
+                    <td>{{ item_form.id }}{{ item_form.goods_issue_item }}</td>
+                    <td>{{ item_form.material }}</td>
+                    <td>{{ item_form.quantity }}</td>
+                    <td>{{ item_form.condition }}</td>
+                    <td>{{ item_form.notes }}</td>
+                    <td>{{ item_form.DELETE }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <button class="btn btn-neutral" type="button" id="add-item-btn">Add More Items</button>
+
+        <div style="margin-top:14px; display:flex; gap:8px;">
+            <button class="btn btn-primary" type="submit">Save Goods Return</button>
+            <a class="btn btn-neutral" href="{% url 'goods_returns' %}">Cancel</a>
+        </div>
+    </form>
+</div>
+
+{% endblock %}

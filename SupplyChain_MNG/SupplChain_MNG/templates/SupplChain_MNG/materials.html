@@ -1,0 +1,79 @@
+{% extends 'SupplChain_MNG/workspace_base.html' %}
+
+{% block title %}Materials{% endblock %}
+{% block page_title %}Materials{% endblock %}
+
+{% block content %}
+<div class="panel panel-pad" style="margin-bottom: 12px;">
+    {% if can_manage_current %}
+    <a class="btn btn-primary" href="{% url 'record_create' 'materials' %}">Add Material</a>
+    {% endif %}
+    <a class="btn btn-neutral" href="{% url 'export_records' 'materials' 'csv' %}?{{ request.GET.urlencode }}">Export CSV</a>
+    <a class="btn btn-neutral" href="{% url 'export_records' 'materials' 'excel' %}?{{ request.GET.urlencode }}">Export Excel</a>
+</div>
+<div class="panel panel-pad table-wrap">
+    <table>
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Code Number</th>
+                <th>Part Number</th>
+                <th>Consumable</th>
+                <th>Measure</th>
+                <th>Category</th>
+                <th>Subcategory</th>
+                <th>Quantity</th>
+                <th>Min Required</th>
+                <th>Location</th>
+                <th>Photo</th>
+                <th>Document</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in rows %}
+            <tr>
+                <td><a href="{% url 'material_detail' item.id %}">{{ item.name }}</a></td>
+                <td>{{ item.code_number }}</td>
+                <td>{{ item.part_number|default:'-' }}</td>
+                <td>{% if item.is_consumable %}Yes{% else %}No{% endif %}</td>
+                <td>{{ item.get_measurement_unit_display }}</td>
+                <td>{{ item.category.name|default:'-' }}</td>
+                <td>{{ item.subcategory.name|default:'-' }}</td>
+                <td>
+                    {{ item.quantity }} {{ item.unit }}
+                    <div><span class="badge {{ item.stock_meta.class_name }}">{{ item.stock_meta.label }}</span></div>
+                </td>
+                <td>{{ item.min_required }}</td>
+                <td>{{ item.location|default:'-' }}</td>
+                <td>
+                    {% if item.photo %}
+                        <a target="_blank" href="{{ item.photo.url }}">
+                            <img class="thumb" src="{{ item.photo.url }}" alt="{{ item.name }} photo">
+                        </a>
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+                <td>
+                    {% if item.document %}
+                        <a class="btn btn-neutral btn-sm" target="_blank" href="{{ item.document.url }}">Open</a>
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+                <td>
+                    <a class="btn btn-neutral btn-sm" href="{% url 'material_detail' item.id %}">View</a>
+                    {% if can_manage_current %}
+                    <a class="btn btn-neutral btn-sm" href="{% url 'record_update' 'materials' item.id %}">Edit</a>
+                    <a class="btn btn-danger btn-sm" href="{% url 'record_delete' 'materials' item.id %}">Delete</a>
+                    {% endif %}
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="13">No materials found for selected filters.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

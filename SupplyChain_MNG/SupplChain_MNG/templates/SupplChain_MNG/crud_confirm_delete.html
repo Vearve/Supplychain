@@ -1,0 +1,15 @@
+{% extends 'SupplChain_MNG/workspace_base.html' %}
+
+{% block title %}{{ title }}{% endblock %}
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="panel panel-pad" style="max-width: 620px;">
+    <p>Are you sure you want to delete: <strong>{{ object }}</strong>?</p>
+    <form method="post" style="display: flex; gap: 8px;">
+        {% csrf_token %}
+        <button class="btn btn-danger" type="submit">Delete</button>
+        <a class="btn btn-neutral" href="{% url cancel_route %}">Cancel</a>
+    </form>
+</div>
+{% endblock %}

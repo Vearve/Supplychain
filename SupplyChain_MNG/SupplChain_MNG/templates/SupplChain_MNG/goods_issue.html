@@ -1,0 +1,73 @@
+{% extends 'SupplChain_MNG/workspace_base.html' %}
+
+{% block title %}Goods Issue{% endblock %}
+{% block page_title %}Goods Issue{% endblock %}
+
+{% block content %}
+<div class="panel panel-pad" style="margin-bottom: 12px; display: flex; gap: 8px; flex-wrap: wrap;">
+    {% if project_context %}
+    <a class="btn btn-neutral" href="{% url 'project_manage' project_context.id %}">← Projects / Sites{% if project_context.location %} · Location: {{ project_context.location }}{% else %} · {{ project_context.name }}{% endif %}</a>
+    {% endif %}
+    {% if can_manage_current %}
+    <a class="btn btn-primary" href="{% url 'goods_issue_create' %}{% if project_context %}?project={{ project_context.id }}{% endif %}">Create Goods Issue</a>
+    {% endif %}
+</div>
+
+<div class="panel panel-pad table-wrap">
+    <table>
+        <thead>
+            <tr>
+                <th>Issue No</th>
+                <th>Date</th>
+                <th>Source Store</th>
+                <th>Department</th>
+                <th>Issued To</th>
+                <th>Items</th>
+                <th>Total Qty</th>
+                <th>Returnables</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in rows %}
+            <tr>
+                <td>{{ item.issue_number }}</td>
+                <td>{{ item.date_issued|date:'Y-m-d' }}</td>
+                <td>{{ item.source_store.name }}</td>
+                <td>{{ item.department|default:'-' }}</td>
+                <td>{{ item.issued_to }}</td>
+                <td>{{ item.item_count }}</td>
+                <td>{{ item.total_quantity }}</td>
+                <td>{{ item.returnable_count }}</td>
+                <td>
+                    {% if item.status == 'POSTED' %}
+                    <span class="badge badge-ok">{{ item.get_status_display }}</span>
+                    {% else %}
+                    <span class="badge badge-neutral">{{ item.get_status_display }}</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if can_manage_current %}
+                    <a class="btn btn-neutral btn-sm" href="{% url 'goods_issue_update' item.id %}">Edit</a>
+                    <a class="btn btn-danger btn-sm" href="{% url 'goods_issue_delete' item.id %}">Delete</a>
+                    {% if item.status == 'DRAFT' %}
+                    <form method="post" style="display:inline;">
+                        {% csrf_token %}
+                        <input type="hidden" name="issue_id" value="{{ item.id }}">
+                        <input type="hidden" name="action" value="post">
+                        <button type="submit" class="btn btn-primary btn-sm">Post</button>
+                    </form>
+                    {% endif %}
+                    {% else %}
+                    <span class="badge badge-neutral">View Only</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="10">No goods issues found.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

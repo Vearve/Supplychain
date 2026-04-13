@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Supply Chain Workspace{% endblock %}</title>
+    <script>
+        (function () {
+            const saved = localStorage.getItem('scm_theme');
+            if (saved === 'dark') {
+                document.documentElement.setAttribute('data-theme', 'dark');
+            }
+        })();
+    </script>
+    <style>
+        :root {
+            --ink: #10212d;
+            --muted: #5e7384;
+            --line: #d4dfe7;
+            --paper: #f3f6f9;
+            --card: #ffffff;
+            --brand: #1f6f8b;
+            --brand-2: #355c7d;
+            --ok: #177f63;
+            --warn: #b86b00;
+            --bad: #b21f35;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            font-family: "Segoe UI", "Verdana", sans-serif;
+            color: var(--ink);
+            background: linear-gradient(180deg, #eef3f7 0%, #f7fafc 60%, #f1f5f9 100%);
+        }
+
+        .layout {
+            min-height: 100vh;
+            display: grid;
+            grid-template-columns: 270px 1fr;
+        }
+
+        .sidebar {
+            background: #0f2c3a;
+            color: #e2eef4;
+            padding: 22px 18px;
+            position: sticky;
+            top: 0;
+            height: 100vh;
+            overflow-y: auto;
+        }
+
+        .brand {
+            font-size: 1.15rem;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .tagline {
+            font-size: 0.86rem;
+            color: #9bb5c5;
+            margin-bottom: 18px;
+        }
+
+        .tabs {
+            display: grid;
+            gap: 7px;
+            margin-bottom: 22px;
+        }
+
+        .tab-link {
+            text-decoration: none;
+            color: #e2eef4;
+            border: 1px solid #35556a;
+            padding: 10px 12px;
+            border-radius: 9px;
+            font-size: 0.92rem;
+            transition: all 0.15s ease;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+
+        .notif-badge {
+            min-width: 20px;
+            height: 20px;
+            padding: 0 6px;
+            border-radius: 999px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: #e52a3f;
+            color: #ffffff;
+            font-size: 0.74rem;
+            font-weight: 700;
+            line-height: 1;
+            box-shadow: 0 2px 8px #00000033;
+        }
+
+        .tab-link:hover {
+            border-color: #6ea7c3;
+            background: #12384a;
+        }
+
+        .tab-link.active {
+            background: linear-gradient(90deg, #235a73, #2f6f8e);
+            border-color: #79b7d2;
+            color: #ffffff;
+        }
+
+        .filters {
+            border-top: 1px solid #2c4a5b;
+            padding-top: 14px;
+        }
+
+        .sidebar-note {
+            border-top: 1px solid #2c4a5b;
+            margin-top: 10px;
+            padding-top: 14px;
+            color: #afc7d5;
+            font-size: 0.86rem;
+        }
+
+        .filters h3 {
+            margin: 0 0 8px;
+            font-size: 0.98rem;
+            color: #c8dde8;
+        }
+
+        .filters label {
+            display: block;
+            margin: 10px 0 5px;
+            font-size: 0.82rem;
+            color: #afc7d5;
+        }
+
+        .filters input,
+        .filters select {
+            width: 100%;
+            border: 1px solid #44667a;
+            border-radius: 7px;
+            padding: 8px;
+            background: #14384a;
+            color: #e2eef4;
+            font-size: 0.88rem;
+        }
+
+        .filter-actions {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .btn {
+            display: inline-block;
+            text-align: center;
+            text-decoration: none;
+            border: 1px solid transparent;
+            border-radius: 8px;
+            padding: 8px 10px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .btn-sm {
+            padding: 4px 8px;
+            font-size: 0.78rem;
+            border-radius: 6px;
+        }
+
+        .btn-primary {
+            color: #fff;
+            background: linear-gradient(90deg, #2f6f8e, #3d89ad);
+        }
+
+        .btn-neutral {
+            color: #12384a;
+            border-color: #8daec0;
+            background: #eaf3f8;
+        }
+
+        .btn-danger {
+            color: #fff;
+            border-color: #b54d60;
+            background: #b73a52;
+        }
+
+        .btn-ghost {
+            color: #d4e8f3;
+            border-color: #527e94;
+            background: transparent;
+        }
+
+        .content {
+            padding: 22px;
+        }
+
+        .topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 16px;
+            position: sticky;
+            top: 0;
+            z-index: 15;
+            background: #f3f6f9e8;
+            backdrop-filter: blur(6px);
+            padding: 10px 0;
+            border-bottom: 1px solid #dde7ef;
+        }
+
+        .topbar-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            position: relative;
+        }
+
+        .filter-trigger {
+            color: #12384a;
+            border-color: #8daec0;
+            background: #eaf3f8;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .icon-btn {
+            width: 38px;
+            height: 38px;
+            border-radius: 10px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            line-height: 1;
+        }
+
+        .icon-btn svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        #theme-toggle .theme-sun { display: none; }
+        html[data-theme='dark'] #theme-toggle .theme-moon { display: none; }
+        html[data-theme='dark'] #theme-toggle .theme-sun { display: block; }
+
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            border: 0;
+            white-space: nowrap;
+        }
+
+        .filter-dropdown {
+            position: absolute;
+            right: 0;
+            top: calc(100% + 8px);
+            width: min(360px, 90vw);
+            z-index: 20;
+            background: #ffffff;
+            border: 1px solid #d4dfe7;
+            border-radius: 12px;
+            box-shadow: 0 14px 28px #2135481f;
+            padding: 12px;
+            display: none;
+        }
+
+        .filter-dropdown.open {
+            display: block;
+        }
+
+        .filter-dropdown h3 {
+            margin: 0 0 8px;
+            font-size: 0.98rem;
+            color: #12384a;
+        }
+
+        .filter-dropdown label {
+            display: block;
+            margin: 10px 0 5px;
+            font-size: 0.82rem;
+            color: #5e7384;
+        }
+
+        .filter-dropdown input,
+        .filter-dropdown select {
+            width: 100%;
+            border: 1px solid #bfd0db;
+            border-radius: 7px;
+            padding: 8px;
+            background: #ffffff;
+            color: #12384a;
+            font-size: 0.88rem;
+        }
+
+        .filter-overlay {
+            position: fixed;
+            inset: 0;
+            background: transparent;
+            z-index: 10;
+            display: none;
+        }
+
+        .filter-overlay.open {
+            display: block;
+        }
+
+        .title h1 {
+            margin: 0;
+            font-size: 1.4rem;
+        }
+
+        .title p {
+            margin: 3px 0 0;
+            color: var(--muted);
+            font-size: 0.9rem;
+        }
+
+        .panel {
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: 14px;
+            box-shadow: 0 10px 20px #2135480b;
+        }
+
+        .panel-pad {
+            padding: 16px;
+        }
+
+        .logout {
+            color: #fff;
+            background: #a6283d;
+            border-color: #be5063;
+        }
+
+        .table-wrap {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.92rem;
+        }
+
+        th, td {
+            padding: 10px 8px;
+            border-bottom: 1px solid #e6edf3;
+            text-align: left;
+            vertical-align: top;
+        }
+
+        th {
+            color: #335164;
+            background: #f3f7fa;
+            position: sticky;
+            top: 0;
+            z-index: 1;
+        }
+
+        .cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+            gap: 12px;
+        }
+
+        .metric {
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            padding: 12px;
+        }
+
+        .metric .label {
+            color: var(--muted);
+            font-size: 0.82rem;
+            margin-bottom: 6px;
+        }
+
+        .metric .value {
+            font-size: 1.35rem;
+            font-weight: 700;
+        }
+
+        .split {
+            display: grid;
+            grid-template-columns: 1.2fr 1fr;
+            gap: 12px;
+        }
+
+        .thumb {
+            width: 54px;
+            height: 54px;
+            object-fit: cover;
+            border-radius: 10px;
+            border: 1px solid #d4dfe7;
+            box-shadow: 0 4px 12px #21354812;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 8px;
+            border-radius: 999px;
+            font-size: 0.76rem;
+            font-weight: 700;
+        }
+
+        .badge-ok { background: #e8f7f1; color: #177f63; }
+        .badge-warn { background: #fff4df; color: #a56400; }
+        .badge-danger { background: #fdecef; color: #b21f35; }
+        .badge-neutral { background: #edf3f7; color: #5e7384; }
+
+        html[data-theme='dark'] body {
+            color: #d7e4ee;
+            background: linear-gradient(180deg, #0f1419 0%, #101a22 55%, #0f171f 100%);
+        }
+
+        html[data-theme='dark'] .topbar {
+            background: #121b23ee;
+            border-bottom-color: #23303b;
+        }
+
+        html[data-theme='dark'] .title p {
+            color: #9db1c1;
+        }
+
+        html[data-theme='dark'] .panel,
+        html[data-theme='dark'] .metric {
+            background: #14202a;
+            border-color: #253443;
+            color: #d7e4ee;
+            box-shadow: none;
+        }
+
+        html[data-theme='dark'] th {
+            background: #16222d;
+            color: #a8c0d3;
+        }
+
+        html[data-theme='dark'] th,
+        html[data-theme='dark'] td {
+            border-bottom-color: #243341;
+        }
+
+        html[data-theme='dark'] .btn-neutral,
+        html[data-theme='dark'] .filter-trigger {
+            color: #d1e0eb;
+            border-color: #3f586c;
+            background: #1b2a36;
+        }
+
+        html[data-theme='dark'] .filter-dropdown {
+            background: #16222d;
+            border-color: #2b3e4e;
+            box-shadow: none;
+        }
+
+        html[data-theme='dark'] .filter-dropdown h3,
+        html[data-theme='dark'] .filter-dropdown label {
+            color: #a8c0d3;
+        }
+
+        html[data-theme='dark'] .filter-dropdown input,
+        html[data-theme='dark'] .filter-dropdown select {
+            background: #1b2a36;
+            color: #d7e4ee;
+            border-color: #375064;
+        }
+
+        /* CSS variable overrides for dark mode (fixes templates using var(--card) etc.) */
+        html[data-theme='dark'] {
+            --ink: #d7e4ee;
+            --muted: #7a9ab5;
+            --line: #253443;
+            --paper: #0f1a22;
+            --card: #14202a;
+        }
+
+        /* Form controls inside panels */
+        html[data-theme='dark'] .panel input,
+        html[data-theme='dark'] .panel select,
+        html[data-theme='dark'] .panel textarea {
+            background: #1b2a36;
+            color: #d7e4ee;
+            border-color: #375064;
+        }
+
+        html[data-theme='dark'] .panel label,
+        html[data-theme='dark'] .panel strong {
+            color: #c5d9e9;
+        }
+
+        html[data-theme='dark'] hr {
+            border-top-color: #253443;
+        }
+
+        /* Upload zone */
+        html[data-theme='dark'] .upload-zone {
+            background: #1a2836;
+            border-color: #375064;
+            color: #7a9ab5;
+        }
+
+        html[data-theme='dark'] .upload-zone.dragover {
+            border-color: #2f7b9e;
+            background: #172532;
+        }
+
+        /* Settings card icon */
+        html[data-theme='dark'] .settings-card-icon {
+            background: linear-gradient(135deg, #1a2e3a, #16283a);
+        }
+
+        /* Badge dark mode */
+        html[data-theme='dark'] .badge-neutral { background: #18303d; color: #7a9ab5; }
+        html[data-theme='dark'] .badge-ok     { background: #122d24; color: #4ac99a; }
+        html[data-theme='dark'] .badge-warn   { background: #2c2010; color: #e0a940; }
+        html[data-theme='dark'] .badge-danger { background: #2c1016; color: #f06b7a; }
+
+        .flash-list {
+            display: grid;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .flash {
+            border-radius: 10px;
+            border: 1px solid #d4dfe7;
+            padding: 10px 12px;
+            font-size: 0.9rem;
+            background: #f8fbfd;
+        }
+
+        .flash-success {
+            border-color: #9fd1bf;
+            background: #e9f8f1;
+            color: #126b52;
+        }
+
+        .flash-error {
+            border-color: #e3aab3;
+            background: #fdeff2;
+            color: #8f1f34;
+        }
+
+        .flash-warning {
+            border-color: #ead2a1;
+            background: #fff7e8;
+            color: #8a5600;
+        }
+
+        @media (max-width: 1080px) {
+            .layout { grid-template-columns: 1fr; }
+            .sidebar {
+                position: static;
+                height: auto;
+                border-bottom: 1px solid #2f4e61;
+            }
+            .split { grid-template-columns: 1fr; }
+        }
+    </style>
+    {% block head_extra %}{% endblock %}
+</head>
+<body>
+    <div class="layout">
+        <aside class="sidebar">
+            <div class="brand">Supply Chain</div>
+            <div class="tagline">Operational Workspace</div>
+
+            <nav class="tabs">
+                <a class="tab-link {% if active_tab == 'home' %}active{% endif %}" href="{% url 'workspace_home' %}">Home</a>
+                <a class="tab-link {% if active_tab == 'overview' %}active{% endif %}" href="{% url 'ops_overview' %}">Ops Overview</a>
+                <a class="tab-link {% if active_tab == 'projects' or active_tab == 'project_manage' %}active{% endif %}" href="{% url 'projects' %}">Projects / Sites</a>
+                <a class="tab-link {% if active_tab == 'requisitions' %}active{% endif %}" href="{% url 'requisitions' %}">
+                    <span>Requisitions</span>
+                    {% if unread_requisitions_count > 0 %}
+                    <span class="notif-badge">{{ unread_requisitions_count }}</span>
+                    {% endif %}
+                </a>
+                <a class="tab-link {% if active_tab == 'delivery' %}active{% endif %}" href="{% url 'delivery_notes' %}">Delivery Notes</a>
+                <a class="tab-link {% if active_tab == 'materials' %}active{% endif %}" href="{% url 'materials' %}">Materials</a>
+                <a class="tab-link {% if active_tab == 'transactions' %}active{% endif %}" href="{% url 'stock_transactions' %}">Stock Transactions</a>
+                <a class="tab-link {% if active_tab == 'equipment' %}active{% endif %}" href="{% url 'equipment_management' %}">Equipment Management</a>
+                <a class="tab-link {% if active_tab == 'fleet' %}active{% endif %}" href="{% url 'fleet_management' %}">Fleet Management</a>
+                <a class="tab-link {% if active_tab == 'analytics' %}active{% endif %}" href="{% url 'analytics' %}">Analytics</a>
+                <a class="tab-link {% if active_tab == 'settings' or active_tab == 'inventory' or active_tab == 'scope' or active_tab == 'categories' or active_tab == 'roles' %}active{% endif %}" href="{% url 'settings' %}">Settings</a>
+                <a class="tab-link {% if active_tab == 'audit' %}active{% endif %}" href="{% url 'audit_log' %}">Audit Log</a>
+            </nav>
+
+            <div class="sidebar-note">Use the Filter button in the header to quickly apply workspace filters.</div>
+        </aside>
+
+        <main class="content">
+            <header class="topbar">
+                <div class="title">
+                    <h1>{% block page_title %}Workspace{% endblock %}</h1>
+                    <p>Welcome, {{ request.user.username }}. Track operational movement and stock health.</p>
+                </div>
+
+                <div class="topbar-actions">
+                    <button type="button" class="btn btn-neutral icon-btn" id="theme-toggle" title="Toggle theme" aria-label="Toggle theme">
+                        <svg class="theme-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z" />
+                        </svg>
+                        <svg class="theme-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <circle cx="12" cy="12" r="4" />
+                            <path d="M12 2v2" /><path d="M12 20v2" />
+                            <path d="M4.93 4.93l1.41 1.41" /><path d="M17.66 17.66l1.41 1.41" />
+                            <path d="M2 12h2" /><path d="M20 12h2" />
+                            <path d="M4.93 19.07l1.41-1.41" /><path d="M17.66 6.34l1.41-1.41" />
+                        </svg>
+                        <span class="sr-only">Toggle theme</span>
+                    </button>
+                    <button type="button" class="btn filter-trigger icon-btn" id="filter-toggle" title="Filters" aria-label="Open filters">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M3 5h18" />
+                            <path d="M6 12h12" />
+                            <path d="M10 19h4" />
+                        </svg>
+                        <span class="sr-only">Filter</span>
+                    </button>
+                    <a class="btn logout icon-btn" href="{% url 'logout' %}" title="Logout" aria-label="Logout">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                            <path d="M16 17l5-5-5-5" />
+                            <path d="M21 12H9" />
+                        </svg>
+                        <span class="sr-only">Logout</span>
+                    </a>
+
+                    <div class="filter-dropdown" id="filter-dropdown">
+                        <form class="filters" method="get" style="border-top:none; padding-top:0;">
+                            <h3>Main Filters</h3>
+
+                            <label for="id_name">Name</label>
+                            <input id="id_name" type="text" name="name" value="{{ filters.name }}">
+
+                            <label for="id_code">Code Number</label>
+                            <input id="id_code" type="text" name="code_number" value="{{ filters.code_number }}">
+
+                            <label for="id_part">Part Number</label>
+                            <input id="id_part" type="text" name="part_number" value="{{ filters.part_number }}">
+
+                            <label for="id_category">Category</label>
+                            <select id="id_category" name="category">
+                                <option value="">All</option>
+                                {% for cat in category_choices %}
+                                    <option value="{{ cat.id }}" {% if filters.category == cat.id|stringformat:'s' %}selected{% endif %}>{{ cat.name }}</option>
+                                {% endfor %}
+                            </select>
+
+                            <label for="id_period">Period</label>
+                            <select id="id_period" name="period">
+                                {% for value, label in period_choices %}
+                                    <option value="{{ value }}" {% if filters.period == value %}selected{% endif %}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
+
+                            <div class="filter-actions">
+                                <button class="btn btn-primary" type="submit">Apply</button>
+                                <a class="btn btn-neutral" href="{{ request.path }}">Reset</a>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </header>
+
+            {% if messages %}
+            <div class="flash-list">
+                {% for message in messages %}
+                <div class="flash {% if message.tags %}flash-{{ message.tags }}{% endif %}">{{ message }}</div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+    <div class="filter-overlay" id="filter-overlay"></div>
+    <script>
+    (function () {
+        const themeToggle = document.getElementById('theme-toggle');
+        const root = document.documentElement;
+
+        function syncThemeButton() {
+            if (!themeToggle) return;
+            const isDark = root.getAttribute('data-theme') === 'dark';
+            themeToggle.setAttribute('title', isDark ? 'Switch to light mode' : 'Switch to dark mode');
+            themeToggle.setAttribute('aria-label', isDark ? 'Switch to light mode' : 'Switch to dark mode');
+        }
+
+        if (themeToggle) {
+            syncThemeButton();
+            themeToggle.addEventListener('click', function () {
+                const isDark = root.getAttribute('data-theme') === 'dark';
+                if (isDark) {
+                    root.removeAttribute('data-theme');
+                    localStorage.setItem('scm_theme', 'light');
+                } else {
+                    root.setAttribute('data-theme', 'dark');
+                    localStorage.setItem('scm_theme', 'dark');
+                }
+                syncThemeButton();
+            });
+        }
+
+        const toggleBtn = document.getElementById('filter-toggle');
+        const dropdown = document.getElementById('filter-dropdown');
+        const overlay = document.getElementById('filter-overlay');
+        if (!toggleBtn || !dropdown || !overlay) return;
+
+        function closeFilters() {
+            dropdown.classList.remove('open');
+            overlay.classList.remove('open');
+        }
+
+        toggleBtn.addEventListener('click', function () {
+            const shouldOpen = !dropdown.classList.contains('open');
+            dropdown.classList.toggle('open', shouldOpen);
+            overlay.classList.toggle('open', shouldOpen);
+        });
+
+        overlay.addEventListener('click', closeFilters);
+        document.addEventListener('keydown', function (event) {
+            if (event.key === 'Escape') closeFilters();
+        });
+    })();
+    </script>
+    {% block scripts %}{% endblock %}
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

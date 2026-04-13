@@ -1,0 +1,44 @@
+{% extends 'SupplChain_MNG/workspace_base.html' %}
+
+{% block title %}Store Scope Management{% endblock %}
+{% block page_title %}Store Scope Management{% endblock %}
+
+{% block content %}
+<div class="panel panel-pad" style="margin-bottom: 12px;">
+    <a class="btn btn-neutral" href="{% url 'settings' %}">← Back to Settings</a>
+</div>
+
+<section class="cards" style="margin-bottom: 12px;">
+    <article class="metric"><div class="label">Total Assignments</div><div class="value">{{ scope_total }}</div></article>
+    <article class="metric"><div class="label">Manage Grants</div><div class="value">{{ scope_manage_total }}</div></article>
+    <article class="metric"><div class="label">Users Covered</div><div class="value">{{ scope_user_total }}</div></article>
+    <article class="metric"><div class="label">Stores Covered</div><div class="value">{{ scope_store_total }}</div></article>
+</section>
+
+<div class="panel panel-pad" style="margin-bottom: 12px; display: flex; gap: 8px; flex-wrap: wrap;">
+    <a class="btn btn-primary" href="{% url 'record_create' 'user-store-scopes' %}">Assign Scope</a>
+    <a class="btn btn-neutral" href="{% url 'export_records' 'user-store-scopes' 'csv' %}">Export CSV</a>
+</div>
+
+<section class="panel panel-pad table-wrap">
+    <h3 style="margin-top: 0;">Assignments</h3>
+    <table>
+        <thead><tr><th>User</th><th>Store</th><th>Can Manage</th><th>Actions</th></tr></thead>
+        <tbody>
+            {% for item in scope_rows %}
+            <tr>
+                <td>{{ item.user.username }}</td>
+                <td>{{ item.store_location.name }}</td>
+                <td>{% if item.can_manage %}<span class="badge badge-ok">Yes</span>{% else %}<span class="badge badge-neutral">No</span>{% endif %}</td>
+                <td>
+                    <a class="btn btn-neutral btn-sm" href="{% url 'record_update' 'user-store-scopes' item.id %}">Edit</a>
+                    <a class="btn btn-danger btn-sm" href="{% url 'record_delete' 'user-store-scopes' item.id %}">Delete</a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="4">No scope assignments found.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endblock %}

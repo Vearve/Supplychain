@@ -1,0 +1,199 @@
+{% extends 'SupplChain_MNG/workspace_base.html' %}
+
+{% block title %}Fleet Management{% endblock %}
+{% block page_title %}Fleet Management{% endblock %}
+
+{% block content %}
+<section class="cards" style="margin-bottom: 12px;">
+    <article class="metric"><div class="label">Active Fleets</div><div class="value">{{ active_fleets_count }}</div></article>
+    <article class="metric"><div class="label">In Maintenance</div><div class="value">{{ in_maintenance_count }}</div></article>
+    <article class="metric"><div class="label">Broken</div><div class="value">{{ broken_count }}</div></article>
+    <article class="metric"><div class="label">Service Due Soon</div><div class="value">{{ due_service_count }}</div></article>
+    <article class="metric"><div class="label">Road Tax Due Soon</div><div class="value">{{ due_road_tax_count }}</div></article>
+    <article class="metric"><div class="label">Fitness Due Soon</div><div class="value">{{ due_fitness_count }}</div></article>
+    <article class="metric"><div class="label">Insurance Due Soon</div><div class="value">{{ due_insurance_count }}</div></article>
+    <article class="metric"><div class="label">Driver Licenses Due Soon</div><div class="value">{{ due_license_count }}</div></article>
+</section>
+
+<div class="panel panel-pad" style="margin-bottom: 12px; display: flex; gap: 8px; flex-wrap: wrap;">
+    <a class="btn btn-neutral" href="{% url 'settings' %}">← Back to Settings</a>
+    {% if can_manage_current %}
+    <a class="btn btn-primary" href="{% url 'record_create' 'mobile-equipment' %}">Add Mobile Equipment</a>
+    <a class="btn btn-primary" href="{% url 'record_create' 'drivers' %}">Add Driver</a>
+    <a class="btn btn-primary" href="{% url 'record_create' 'fleet-fuel-logs' %}">Add Fuel/Oil Log</a>
+    <a class="btn btn-primary" href="{% url 'record_create' 'fleet-maintenance' %}">Add Maintenance</a>
+    {% endif %}
+    {% if can_manage_inventory_movements %}
+    <a class="btn btn-primary" href="{% url 'record_create' 'inventory-movements' %}">Record Movement</a>
+    {% endif %}
+    <a class="btn btn-neutral" href="{% url 'export_records' 'mobile-equipment' 'csv' %}">Equipment CSV</a>
+    <a class="btn btn-neutral" href="{% url 'export_records' 'mobile-equipment' 'excel' %}">Equipment Excel</a>
+    <a class="btn btn-neutral" href="{% url 'export_records' 'drivers' 'csv' %}">Drivers CSV</a>
+    <a class="btn btn-neutral" href="{% url 'export_records' 'fleet-fuel-logs' 'excel' %}">Fuel Logs Excel</a>
+    <a class="btn btn-neutral" href="{% url 'export_records' 'fleet-maintenance' 'excel' %}">Maintenance Excel</a>
+    <a class="btn btn-neutral" href="{% url 'export_records' 'inventory-movements' 'excel' %}">Movements Excel</a>
+</div>
+
+<section class="panel panel-pad table-wrap" style="margin-bottom: 12px;">
+    <h3 style="margin-top: 0;">Mobile Equipment</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Name</th><th>Reg Number</th><th>Type</th><th>Linked Store</th><th>Status</th><th>Driver</th><th>From</th><th>To</th><th>Service Due</th><th>Insurance</th><th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in equipment_rows %}
+            <tr>
+                <td>{{ item.name }}</td>
+                <td>{{ item.registration_number }}</td>
+                <td>{{ item.equipment_type }}</td>
+                <td>{{ item.store_location.name|default:'-' }}</td>
+                <td>{{ item.get_status_display }}</td>
+                <td>{{ item.assigned_driver.full_name|default:'-' }}</td>
+                <td>{{ item.current_route_from|default:'-' }}</td>
+                <td>{{ item.current_route_to|default:'-' }}</td>
+                <td>
+                    {{ item.service_due_date|date:'Y-m-d'|default:'-' }}
+                    <div><span class="badge {{ item.service_due_meta.class_name }}">{{ item.service_due_meta.label }}</span></div>
+                </td>
+                <td>
+                    {{ item.insurance_due_date|date:'Y-m-d'|default:'-' }}
+                    <div><span class="badge {{ item.insurance_due_meta.class_name }}">{{ item.insurance_due_meta.label }}</span></div>
+                </td>
+                <td>
+                    {% if can_manage_current %}
+                    <a class="btn btn-neutral btn-sm" href="{% url 'record_update' 'mobile-equipment' item.id %}">Edit</a>
+                    <a class="btn btn-danger btn-sm" href="{% url 'record_delete' 'mobile-equipment' item.id %}">Delete</a>
+                    {% else %}
+                    <span class="badge badge-neutral">View Only</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="11">No mobile equipment found.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+
+<section class="split" style="margin-bottom: 12px;">
+    <div class="panel panel-pad table-wrap">
+        <h3 style="margin-top: 0;">Drivers</h3>
+        <table>
+            <thead><tr><th>Name</th><th>Phone</th><th>License</th><th>Expiry</th><th>Actions</th></tr></thead>
+            <tbody>
+                {% for item in driver_rows %}
+                <tr>
+                    <td>{{ item.full_name }}</td>
+                    <td>{{ item.phone_number|default:'-' }}</td>
+                    <td>{{ item.license_number }}</td>
+                    <td>
+                        {{ item.license_expiry|date:'Y-m-d'|default:'-' }}
+                        <div><span class="badge {{ item.license_due_meta.class_name }}">{{ item.license_due_meta.label }}</span></div>
+                    </td>
+                    <td>
+                        {% if can_manage_current %}
+                        <a class="btn btn-neutral btn-sm" href="{% url 'record_update' 'drivers' item.id %}">Edit</a>
+                        <a class="btn btn-danger btn-sm" href="{% url 'record_delete' 'drivers' item.id %}">Delete</a>
+                        {% else %}
+                        <span class="badge badge-neutral">View Only</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="5">No drivers found.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="panel panel-pad table-wrap">
+        <h3 style="margin-top: 0;">Fuel / Oil Logs</h3>
+        <table>
+            <thead><tr><th>Date</th><th>Equipment</th><th>Store</th><th>Type</th><th>Qty</th><th>Actions</th></tr></thead>
+            <tbody>
+                {% for item in fuel_rows %}
+                <tr>
+                    <td>{{ item.date_logged|date:'Y-m-d H:i' }}</td>
+                    <td>{{ item.equipment }}</td>
+                    <td>{{ item.equipment.store_location.name|default:'-' }}</td>
+                    <td>{{ item.get_fluid_type_display }}</td>
+                    <td>{{ item.quantity }} {{ item.unit }}</td>
+                    <td>
+                        {% if can_manage_current %}
+                        <a class="btn btn-neutral btn-sm" href="{% url 'record_update' 'fleet-fuel-logs' item.id %}">Edit</a>
+                        <a class="btn btn-danger btn-sm" href="{% url 'record_delete' 'fleet-fuel-logs' item.id %}">Delete</a>
+                        {% else %}
+                        <span class="badge badge-neutral">View Only</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="6">No fuel/oil logs found.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section class="panel panel-pad table-wrap">
+    <h3 style="margin-top: 0;">Maintenance Records</h3>
+    <table>
+        <thead><tr><th>Equipment</th><th>Store</th><th>Type</th><th>Status</th><th>Start</th><th>End</th><th>Cost</th><th>Actions</th></tr></thead>
+        <tbody>
+            {% for item in maintenance_rows %}
+            <tr>
+                <td>{{ item.equipment }}</td>
+                <td>{{ item.equipment.store_location.name|default:'-' }}</td>
+                <td>{{ item.get_maintenance_type_display }}</td>
+                <td>{{ item.get_status_display }}</td>
+                <td>{{ item.start_date|date:'Y-m-d' }}</td>
+                <td>{{ item.end_date|date:'Y-m-d'|default:'-' }}</td>
+                <td>{{ item.cost }}</td>
+                <td>
+                    {% if can_manage_current %}
+                    <a class="btn btn-neutral btn-sm" href="{% url 'record_update' 'fleet-maintenance' item.id %}">Edit</a>
+                    <a class="btn btn-danger btn-sm" href="{% url 'record_delete' 'fleet-maintenance' item.id %}">Delete</a>
+                    {% else %}
+                    <span class="badge badge-neutral">View Only</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="8">No maintenance records found.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+
+<section class="panel panel-pad table-wrap" style="margin-top: 12px;">
+    <h3 style="margin-top: 0;">Recent Inventory Movements</h3>
+    <table>
+        <thead><tr><th>Date</th><th>Type</th><th>Material</th><th>Qty</th><th>From</th><th>To</th><th>Reference</th><th>Actions</th></tr></thead>
+        <tbody>
+            {% for item in movement_rows %}
+            <tr>
+                <td>{{ item.created_at|date:'Y-m-d H:i' }}</td>
+                <td>{{ item.get_movement_type_display }}</td>
+                <td>{{ item.material.name }}</td>
+                <td>{{ item.quantity }}</td>
+                <td>{{ item.from_store.name|default:'-' }}{% if item.from_bin %} / BIN {{ item.from_bin.bin_code }}{% endif %}</td>
+                <td>{{ item.to_store.name|default:'-' }}{% if item.to_bin %} / BIN {{ item.to_bin.bin_code }}{% endif %}</td>
+                <td>{{ item.reference_type|default:'-' }} {{ item.reference_number|default:'' }}</td>
+                <td>
+                    {% if can_manage_inventory_movements %}
+                    <a class="btn btn-neutral btn-sm" href="{% url 'record_update' 'inventory-movements' item.id %}">Edit</a>
+                    <a class="btn btn-danger btn-sm" href="{% url 'record_delete' 'inventory-movements' item.id %}">Delete</a>
+                    {% else %}
+                    <span class="badge badge-neutral">View Only</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="8">No inventory movements yet.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endblock %}

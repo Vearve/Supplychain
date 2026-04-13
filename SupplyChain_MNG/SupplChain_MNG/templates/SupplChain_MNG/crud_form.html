@@ -1,0 +1,120 @@
+{% extends 'SupplChain_MNG/workspace_base.html' %}
+
+{% block title %}{{ title }}{% endblock %}
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="panel panel-pad" style="max-width: 860px;">
+    <style>
+        .upload-zone {
+            border: 2px dashed #9fc0d0;
+            border-radius: 12px;
+            background: #f5fafc;
+            padding: 14px;
+        }
+
+        .upload-zone.dragover {
+            border-color: #2f6f8e;
+            background: #eaf5fb;
+        }
+
+        .upload-meta {
+            margin-top: 6px;
+            color: #5e7384;
+            font-size: 0.82rem;
+        }
+    </style>
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        {{ form.non_field_errors }}
+        <div style="display: grid; gap: 12px;">
+            {% for field in form %}
+            <div>
+                <label style="font-size: 0.9rem; font-weight: 600; display: block; margin-bottom: 4px;">{{ field.label }}</label>
+                {% if field.name == 'photo' or field.name == 'document' %}
+                <div class="upload-zone" data-upload-zone>
+                    {{ field }}
+                    <div class="upload-meta" data-upload-meta>Drop a file here or browse from your device.</div>
+                </div>
+                {% else %}
+                {{ field }}
+                {% endif %}
+                {% if field.help_text %}
+                <small style="color: #5e7384;">{{ field.help_text }}</small>
+                {% endif %}
+                {% for error in field.errors %}
+                <div style="color: #b21f35; font-size: 0.85rem;">{{ error }}</div>
+                {% endfor %}
+            </div>
+            {% endfor %}
+        </div>
+
+        <div style="margin-top: 14px; display: flex; gap: 8px;">
+            <button class="btn btn-primary" type="submit">{{ submit_label }}</button>
+            <a class="btn btn-neutral" href="{% url cancel_route %}">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.querySelectorAll('[data-upload-zone]').forEach((zone) => {
+        const input = zone.querySelector('input[type="file"]');
+        const meta = zone.querySelector('[data-upload-meta]');
+        if (!input) return;
+
+        const updateMeta = () => {
+            if (input.files && input.files.length) {
+                const file = input.files[0];
+                const sizeMb = (file.size / (1024 * 1024)).toFixed(2);
+                meta.textContent = `${file.name} (${sizeMb} MB)`;
+            }
+        };
+
+        input.addEventListener('change', updateMeta);
+        ['dragenter', 'dragover'].forEach((eventName) => {
+            zone.addEventListener(eventName, (event) => {
+                event.preventDefault();
+                zone.classList.add('dragover');
+            });
+        });
+        ['dragleave', 'drop'].forEach((eventName) => {
+            zone.addEventListener(eventName, (event) => {
+                event.preventDefault();
+                zone.classList.remove('dragover');
+            });
+        });
+        zone.addEventListener('drop', (event) => {
+            const files = event.dataTransfer.files;
+            if (!files || !files.length) return;
+            input.files = files;
+            updateMeta();
+        });
+    });
+</script>
+<script>
+(function () {
+    // Auto-fill on_hand / reserved from material.quantity / min_required
+    // when creating/editing an InventoryBalance record.
+    const materialSelect = document.getElementById('id_material');
+    const onHandField = document.getElementById('id_on_hand');
+    if (!materialSelect || !onHandField) return;
+
+    materialSelect.addEventListener('change', function () {
+        const pk = materialSelect.value;
+        if (!pk) return;
+
+        fetch('/workspace/api/material/' + pk + '/stock/')
+            .then(function (res) { return res.ok ? res.json() : null; })
+            .then(function (data) {
+                if (!data) return;
+                onHandField.value = data.quantity;
+                const reservedField = document.getElementById('id_reserved');
+                if (reservedField) reservedField.value = data.min_required;
+            })
+            .catch(function () {});
+    });
+})();
+</script>
+{% endblock %}

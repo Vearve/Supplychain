@@ -1,0 +1,129 @@
+{% extends 'SupplChain_MNG/workspace_base.html' %}
+
+{% block title %}Workspace Home{% endblock %}
+{% block page_title %}Home{% endblock %}
+
+{% block head_extra %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% endblock %}
+
+{% block content %}
+<section class="cards" style="margin-bottom: 12px;">
+    <article class="metric"><div class="label">Total Materials</div><div class="value">{{ total_materials }}</div></article>
+    <article class="metric"><div class="label">Low Stock</div><div class="value">{{ low_stock_count }}</div></article>
+    <article class="metric"><div class="label">Total Categories</div><div class="value">{{ total_categories }}</div></article>
+    <article class="metric"><div class="label">Active Equipments</div><div class="value">{{ active_equipments }}</div></article>
+    <article class="metric"><div class="label">Active Fleets</div><div class="value">{{ active_fleets }}</div></article>
+    <article class="metric"><div class="label">Total Requisitions</div><div class="value">{{ total_requisitions }}</div></article>
+    <article class="metric"><div class="label">Pending Requisitions</div><div class="value">{{ pending_requisitions }}</div></article>
+    <article class="metric"><div class="label">Stock Transactions</div><div class="value">{{ total_transactions }}</div></article>
+    <article class="metric"><div class="label">Total Quantity</div><div class="value">{{ total_quantity }}</div></article>
+</section>
+
+<section class="split" style="margin-bottom: 12px;">
+    <div class="panel panel-pad">
+        <h3 style="margin-top: 0;">Materials by Category</h3>
+        <canvas id="categoryChart" height="140"></canvas>
+    </div>
+    <div class="panel panel-pad">
+        <h3 style="margin-top: 0;">Stock Transaction Type</h3>
+        <canvas id="transactionChart" height="140"></canvas>
+    </div>
+</section>
+
+<section class="split" style="margin-bottom: 12px;">
+    <div class="panel panel-pad">
+        <h3 style="margin-top: 0;">Requisitions by Department</h3>
+        <canvas id="requisitionChart" height="140"></canvas>
+    </div>
+    <div class="panel panel-pad">
+        <h3 style="margin-top: 0;">Top Material Quantity</h3>
+        <canvas id="materialPieChart" height="140"></canvas>
+    </div>
+</section>
+
+<section class="split">
+    <div class="panel panel-pad table-wrap">
+        <h3 style="margin-top: 0;">Recent Stock Transactions</h3>
+        <table>
+            <thead>
+                <tr><th>Date</th><th>Material</th><th>Type</th><th>Qty</th><th>User</th></tr>
+            </thead>
+            <tbody>
+                {% for t in recent_transactions %}
+                <tr>
+                    <td>{{ t.date|date:'Y-m-d H:i' }}</td>
+                    <td>{{ t.material.name|default:'Unknown' }}</td>
+                    <td>{{ t.get_transaction_type_display }}</td>
+                    <td>{{ t.quantity }}</td>
+                    <td>{{ t.performed_by.username|default:'N/A' }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="5">No recent transactions.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="panel panel-pad table-wrap">
+        <h3 style="margin-top: 0;">Low Stock Items</h3>
+        <table>
+            <thead>
+                <tr><th>Material</th><th>Qty</th><th>Minimum</th></tr>
+            </thead>
+            <tbody>
+                {% for item in low_stock %}
+                <tr>
+                    <td>{{ item.name }}</td>
+                    <td>{{ item.quantity }}</td>
+                    <td>{{ item.min_required }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="3">All items are sufficiently stocked.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const categoryData = JSON.parse('{{ category_counts_json|escapejs }}');
+    const transactionData = JSON.parse('{{ transaction_counts_json|escapejs }}');
+    const requisitionData = JSON.parse('{{ requisition_counts_json|escapejs }}');
+    const materialData = JSON.parse('{{ material_counts_json|escapejs }}');
+
+    new Chart(document.getElementById('categoryChart'), {
+        type: 'bar',
+        data: {
+            labels: categoryData.map(c => c.category__name || 'Unassigned'),
+            datasets: [{ label: 'Materials', data: categoryData.map(c => c.material_count), backgroundColor: '#2f6f8e' }]
+        }
+    });
+
+    new Chart(document.getElementById('transactionChart'), {
+        type: 'doughnut',
+        data: {
+            labels: transactionData.map(t => t.transaction_type),
+            datasets: [{ data: transactionData.map(t => t.count), backgroundColor: ['#177f63', '#b21f35'] }]
+        }
+    });
+
+    new Chart(document.getElementById('requisitionChart'), {
+        type: 'bar',
+        data: {
+            labels: requisitionData.map(r => r.department),
+            datasets: [{ label: 'Requisitions', data: requisitionData.map(r => r.count), backgroundColor: '#355c7d' }]
+        }
+    });
+
+    new Chart(document.getElementById('materialPieChart'), {
+        type: 'pie',
+        data: {
+            labels: materialData.map(m => m.name),
+            datasets: [{ data: materialData.map(m => m.quantity), backgroundColor: ['#2f6f8e','#177f63','#355c7d','#a76f00','#b21f35','#6b5b95','#4e8098','#6c757d','#1d3557','#8d99ae'] }]
+        }
+    });
+</script>
+{% endblock %}

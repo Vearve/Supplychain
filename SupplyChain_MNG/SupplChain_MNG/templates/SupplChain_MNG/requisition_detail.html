@@ -1,0 +1,105 @@
+{% extends 'SupplChain_MNG/workspace_base.html' %}
+
+{% block title %}Requisition {{ req.req_number|default:req.id }}{% endblock %}
+{% block page_title %}Requisition Details{% endblock %}
+
+{% block content %}
+<div class="panel panel-pad" style="margin-bottom: 12px; display:flex; gap:8px; flex-wrap:wrap;">
+    {% if project_context %}
+    <a class="btn btn-neutral" href="{% url 'project_manage' project_context.id %}">← Projects / Sites{% if project_context.location %} · Location: {{ project_context.location }}{% else %} · {{ project_context.name }}{% endif %}</a>
+    {% endif %}
+    <a class="btn btn-neutral" href="{% url 'requisitions' %}{% if project_context %}?project={{ project_context.id }}{% endif %}">← Back to Requisitions</a>
+</div>
+
+<div class="panel panel-pad" style="margin-bottom: 12px;">
+    <h3 style="margin-top:0;">Request Header</h3>
+    <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:10px;">
+        <div><strong>Requisition No</strong><div>{{ req.req_number|default:req.id }}</div></div>
+        <div><strong>Status</strong><div>{{ req.get_status_display }}</div></div>
+        <div><strong>Date Requested</strong><div>{{ req.date_requested|date:'Y-m-d H:i' }}</div></div>
+        <div><strong>Project / Site</strong><div>{{ req.project.name|default:'-' }}</div></div>
+        <div><strong>Department</strong><div>{{ req.get_department_display|default:req.department }}</div></div>
+        <div><strong>Requested By</strong><div>{{ req.requested_by.username|default:'-' }}</div></div>
+        <div><strong>Validated By</strong><div>{{ req.validated_by.username|default:'-' }}</div></div>
+        <div><strong>Validated At</strong><div>{{ req.validated_at|date:'Y-m-d H:i'|default:'-' }}</div></div>
+        <div><strong>Approved By</strong><div>{{ req.approved_by.username|default:'-' }}</div></div>
+        <div><strong>Approved At</strong><div>{{ req.approved_at|date:'Y-m-d H:i'|default:'-' }}</div></div>
+        <div><strong>Rejected By</strong><div>{{ req.rejected_by.username|default:'-' }}</div></div>
+        <div><strong>Rejected At</strong><div>{{ req.rejected_at|date:'Y-m-d H:i'|default:'-' }}</div></div>
+        <div><strong>Reserved Quantity</strong><div>{{ req.reserved_quantity }}</div></div>
+    </div>
+    {% if req.rejection_reason %}
+    <div style="margin-top:10px;"><strong>Rejection Reason</strong><div>{{ req.rejection_reason }}</div></div>
+    {% endif %}
+    {% if req.notes %}
+    <div style="margin-top:10px;"><strong>Notes</strong><div>{{ req.notes }}</div></div>
+    {% endif %}
+</div>
+
+<div class="panel panel-pad table-wrap" style="margin-bottom: 12px;">
+    <h3 style="margin-top:0;">Requested Items</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Material</th>
+                <th>Code</th>
+                <th>Part Number</th>
+                <th>Category</th>
+                <th>Requested Qty</th>
+                <th>Line Notes</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in line_items %}
+            <tr>
+                {% if item.material %}
+                <td>{{ item.material.name }}</td>
+                <td>{{ item.material.code_number|default:'-' }}</td>
+                <td>{{ item.material.part_number|default:'-' }}</td>
+                <td>{{ item.material.category.name|default:'-' }}</td>
+                <td>{% if item.quantity_requested is not None %}{{ item.quantity_requested }}{% else %}{{ req.quantity_requested }}{% endif %}</td>
+                <td>{{ item.notes|default:'-' }}</td>
+                {% else %}
+                <td>{{ req.material.name|default:'Unknown' }}</td>
+                <td>{{ req.code_number_display|default:'-' }}</td>
+                <td>{{ req.material.part_number|default:'-' }}</td>
+                <td>{{ req.material.category.name|default:'-' }}</td>
+                <td>{{ req.quantity_requested }}</td>
+                <td>-</td>
+                {% endif %}
+            </tr>
+            {% empty %}
+            <tr><td colspan="6">No item lines attached to this requisition.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="panel panel-pad table-wrap">
+    <h3 style="margin-top:0;">Reservation Allocation</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Material</th>
+                <th>Store</th>
+                <th>BIN</th>
+                <th>Reserved Qty</th>
+                <th>Recorded At</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in reservation_lines %}
+            <tr>
+                <td>{{ item.inventory_balance.material.name }}</td>
+                <td>{{ item.inventory_balance.storage_bin.store_location.name }}</td>
+                <td>{{ item.inventory_balance.storage_bin.bin_code }}</td>
+                <td>{{ item.quantity }}</td>
+                <td>{{ item.created_at|date:'Y-m-d H:i' }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5">No reservation lines recorded yet.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

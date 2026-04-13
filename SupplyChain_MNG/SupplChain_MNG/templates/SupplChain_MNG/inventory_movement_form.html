@@ -1,0 +1,285 @@
+{% extends 'SupplChain_MNG/workspace_base.html' %}
+
+{% block title %}{{ title }}{% endblock %}
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="panel panel-pad" style="max-width: 960px;">
+  <form method="post" enctype="multipart/form-data" id="movement-form">
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+
+    <!-- ── HEADER FIELDS ──────────────────────────────────────── -->
+    <div style="display: grid; gap: 12px;">
+
+      <!-- Movement Type -->
+      <div>
+        <label style="font-size:0.9rem;font-weight:600;display:block;margin-bottom:4px;">{{ form.movement_type.label }}</label>
+        {{ form.movement_type }}
+        {% for e in form.movement_type.errors %}<div style="color:#b21f35;font-size:0.85rem;">{{ e }}</div>{% endfor %}
+      </div>
+
+      <!-- Delivery Note -->
+      <div>
+        <label style="font-size:0.9rem;font-weight:600;display:block;margin-bottom:4px;">
+          {{ form.delivery_note.label }}
+          {% if formset %}<span style="color:#999;font-weight:400;">(Optional — auto-fills all material rows)</span>{% endif %}
+        </label>
+        {{ form.delivery_note }}
+        {% for e in form.delivery_note.errors %}<div style="color:#b21f35;font-size:0.85rem;">{{ e }}</div>{% endfor %}
+      </div>
+
+      <!-- ── MATERIAL ROWS (create mode) ───────────────────────── -->
+      {% if formset %}
+      <div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+          <span style="font-size:0.9rem;font-weight:700;">Materials</span>
+          <button type="button" id="add-row-btn" class="btn btn-neutral" style="font-size:0.8rem;padding:4px 10px;">+ Add Row</button>
+        </div>
+
+        {{ formset.management_form }}
+        {% if formset.non_form_errors %}
+          {% for e in formset.non_form_errors %}<div style="color:#b21f35;font-size:0.85rem;margin-bottom:4px;">{{ e }}</div>{% endfor %}
+        {% endif %}
+
+        <!-- Column headers -->
+        <div style="display:grid;grid-template-columns:1fr 140px 36px;gap:8px;margin-bottom:4px;padding:0 4px;">
+          <span style="font-size:0.8rem;font-weight:600;color:#5e7384;">Material</span>
+          <span style="font-size:0.8rem;font-weight:600;color:#5e7384;">Quantity</span>
+          <span></span>
+        </div>
+
+        <div id="items-container">
+          {% for item_form in formset %}
+          <div class="item-row" style="display:grid;grid-template-columns:1fr 140px 36px;gap:8px;align-items:start;margin-bottom:6px;">
+            <div>
+              {{ item_form.material }}
+              {% for e in item_form.material.errors %}<div style="color:#b21f35;font-size:0.8rem;">{{ e }}</div>{% endfor %}
+            </div>
+            <div>
+              {{ item_form.quantity }}
+              {% for e in item_form.quantity.errors %}<div style="color:#b21f35;font-size:0.8rem;">{{ e }}</div>{% endfor %}
+            </div>
+            <div style="display:flex;align-items:center;height:36px;">
+              {% if item_form.DELETE %}
+                {{ item_form.DELETE }}
+                <label for="{{ item_form.DELETE.id_for_label }}" style="margin-left:4px;cursor:pointer;" title="Remove row">&#10005;</label>
+              {% endif %}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+
+        <!-- Empty row template (hidden) -->
+        <div id="empty-row-template" style="display:none;" aria-hidden="true">
+          <div class="item-row" style="display:grid;grid-template-columns:1fr 140px 36px;gap:8px;align-items:start;margin-bottom:6px;">
+            <div>
+              <select name="items-__prefix__-material" id="id_items-__prefix__-material" style="width:100%;">
+                {% for opt in formset.empty_form.material.field.choices %}
+                <option value="{{ opt.0 }}">{{ opt.1 }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div>
+              <input type="number" name="items-__prefix__-quantity" id="id_items-__prefix__-quantity" step="0.01" min="0.01" style="width:100%;">
+            </div>
+            <div style="display:flex;align-items:center;height:36px;">
+              <input type="checkbox" name="items-__prefix__-DELETE" id="id_items-__prefix__-DELETE" style="display:none;">
+              <label for="id_items-__prefix__-DELETE" style="cursor:pointer;color:#b21f35;" title="Remove row">&#10005;</label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {% else %}
+      <!-- ── SINGLE MATERIAL (edit mode) ──────────────────────── -->
+      <div>
+        <label style="font-size:0.9rem;font-weight:600;display:block;margin-bottom:4px;">{{ form.material.label }}</label>
+        {{ form.material }}
+        {% for e in form.material.errors %}<div style="color:#b21f35;font-size:0.85rem;">{{ e }}</div>{% endfor %}
+      </div>
+      <div>
+        <label style="font-size:0.9rem;font-weight:600;display:block;margin-bottom:4px;">{{ form.quantity.label }}</label>
+        {{ form.quantity }}
+        {% for e in form.quantity.errors %}<div style="color:#b21f35;font-size:0.85rem;">{{ e }}</div>{% endfor %}
+      </div>
+      {% endif %}
+
+      <hr style="margin:12px 0;border:none;border-top:1px solid #d4dfe7;">
+
+      <!-- Store + Bin -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div>
+          <label style="font-size:0.9rem;font-weight:600;display:block;margin-bottom:4px;">{{ form.from_store.label }}</label>
+          {{ form.from_store }}
+          {% for e in form.from_store.errors %}<div style="color:#b21f35;font-size:0.85rem;">{{ e }}</div>{% endfor %}
+        </div>
+        <div>
+          <label style="font-size:0.9rem;font-weight:600;display:block;margin-bottom:4px;">{{ form.from_bin.label }}</label>
+          {{ form.from_bin }}
+          {% for e in form.from_bin.errors %}<div style="color:#b21f35;font-size:0.85rem;">{{ e }}</div>{% endfor %}
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div>
+          <label style="font-size:0.9rem;font-weight:600;display:block;margin-bottom:4px;">{{ form.to_store.label }}</label>
+          {{ form.to_store }}
+          {% for e in form.to_store.errors %}<div style="color:#b21f35;font-size:0.85rem;">{{ e }}</div>{% endfor %}
+        </div>
+        <div>
+          <label style="font-size:0.9rem;font-weight:600;display:block;margin-bottom:4px;">{{ form.to_bin.label }}</label>
+          {{ form.to_bin }}
+          {% for e in form.to_bin.errors %}<div style="color:#b21f35;font-size:0.85rem;">{{ e }}</div>{% endfor %}
+        </div>
+      </div>
+
+      <hr style="margin:12px 0;border:none;border-top:1px solid #d4dfe7;">
+
+      <!-- Fleet / Driver -->
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+        <div>
+          <label style="font-size:0.9rem;font-weight:600;display:block;margin-bottom:4px;">{{ form.driver.label }}</label>
+          {{ form.driver }}
+          {% for e in form.driver.errors %}<div style="color:#b21f35;font-size:0.85rem;">{{ e }}</div>{% endfor %}
+        </div>
+        <div>
+          <label style="font-size:0.9rem;font-weight:600;display:block;margin-bottom:4px;">{{ form.mobile_equipment.label }}</label>
+          {{ form.mobile_equipment }}
+          {% for e in form.mobile_equipment.errors %}<div style="color:#b21f35;font-size:0.85rem;">{{ e }}</div>{% endfor %}
+        </div>
+        <div>
+          <label style="font-size:0.9rem;font-weight:600;display:block;margin-bottom:4px;">{{ form.reference_type.label }}</label>
+          {{ form.reference_type }}
+          {% for e in form.reference_type.errors %}<div style="color:#b21f35;font-size:0.85rem;">{{ e }}</div>{% endfor %}
+        </div>
+      </div>
+
+      <div>
+        <label style="font-size:0.9rem;font-weight:600;display:block;margin-bottom:4px;">{{ form.reference_number.label }}</label>
+        {{ form.reference_number }}
+        {% for e in form.reference_number.errors %}<div style="color:#b21f35;font-size:0.85rem;">{{ e }}</div>{% endfor %}
+      </div>
+      <div>
+        <label style="font-size:0.9rem;font-weight:600;display:block;margin-bottom:4px;">{{ form.notes.label }}</label>
+        {{ form.notes }}
+        {% for e in form.notes.errors %}<div style="color:#b21f35;font-size:0.85rem;">{{ e }}</div>{% endfor %}
+      </div>
+
+      {% if form.created_by %}
+      <div>
+        <label style="font-size:0.9rem;font-weight:600;display:block;margin-bottom:4px;">{{ form.created_by.label }}</label>
+        {{ form.created_by }}
+        {% for e in form.created_by.errors %}<div style="color:#b21f35;font-size:0.85rem;">{{ e }}</div>{% endfor %}
+      </div>
+      {% endif %}
+    </div>
+
+    <div style="margin-top:14px;display:flex;gap:8px;">
+      <button class="btn btn-primary" type="submit">{% if formset %}Create Movements{% else %}{{ submit_label }}{% endif %}</button>
+      <a class="btn btn-neutral" href="{% if cancel_url %}{{ cancel_url }}{% else %}{% url cancel_route %}{% endif %}">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+    // ── BIN AUTO-LOAD ────────────────────────────────────────────
+    function initBinLoader(storeId, binId) {
+        const storeSelect = document.getElementById(storeId);
+        const binSelect   = document.getElementById(binId);
+        if (!storeSelect || !binSelect) return;
+
+        function loadBins(storeVal) {
+            binSelect.innerHTML = '<option value="">---------</option>';
+            if (!storeVal) return;
+            fetch('/workspace/api/store/' + storeVal + '/bins/')
+                .then(r => r.json())
+                .then(data => {
+                    data.bins.forEach(function (b) {
+                        const opt = document.createElement('option');
+                        opt.value = b.id;
+                        opt.textContent = b.label;
+                        binSelect.appendChild(opt);
+                    });
+                })
+                .catch(function (e) { console.error('bins error', e); });
+        }
+        storeSelect.addEventListener('change', function () { loadBins(this.value); });
+        if (storeSelect.value) loadBins(storeSelect.value);
+    }
+
+    initBinLoader('id_from_store', 'id_from_bin');
+    initBinLoader('id_to_store',   'id_to_bin');
+
+    // ── MULTI-ROW MODE ───────────────────────────────────────────
+    const container   = document.getElementById('items-container');
+    const addBtn      = document.getElementById('add-row-btn');
+    const template    = document.getElementById('empty-row-template');
+    const totalForms  = document.getElementById('id_items-TOTAL_FORMS');
+    if (!container || !addBtn || !template || !totalForms) return;  // edit mode — stop here
+
+    // ── ADD ROW ──
+    addBtn.addEventListener('click', function () {
+        const idx = parseInt(totalForms.value, 10);
+        const clone = template.firstElementChild.cloneNode(true);
+        clone.innerHTML = clone.innerHTML.replace(/__prefix__/g, idx);
+        container.appendChild(clone);
+        totalForms.value = idx + 1;
+        wireDeleteCheckbox(clone);
+    });
+
+    // Wire delete checkbox on existing rows
+    container.querySelectorAll('.item-row').forEach(wireDeleteCheckbox);
+
+    function wireDeleteCheckbox(row) {
+        const lbl = row.querySelector('label[for$="-DELETE"]');
+        const chk = row.querySelector('input[type="checkbox"][name$="-DELETE"]');
+        if (!lbl || !chk) return;
+        lbl.addEventListener('click', function (e) {
+            e.preventDefault();
+            chk.checked = !chk.checked;
+            row.style.opacity = chk.checked ? '0.4' : '1';
+        });
+    }
+
+    // ── DELIVERY NOTE AUTO-FILL ──
+    const dnSelect = document.getElementById('id_delivery_note');
+    if (!dnSelect) return;
+
+    dnSelect.addEventListener('change', function () {
+        const dnId = this.value;
+        if (!dnId) return;
+
+        fetch('/workspace/api/delivery-note/' + dnId + '/materials/')
+            .then(r => r.json())
+            .then(function (data) {
+                if (!data.materials || data.materials.length === 0) return;
+
+                // Remove all current rows
+                container.innerHTML = '';
+                totalForms.value = '0';
+
+                // Add one row per material from the delivery note
+                data.materials.forEach(function (m) {
+                    const idx = parseInt(totalForms.value, 10);
+                    const clone = template.firstElementChild.cloneNode(true);
+                    clone.innerHTML = clone.innerHTML.replace(/__prefix__/g, idx);
+                    container.appendChild(clone);
+                    totalForms.value = idx + 1;
+
+                    // Set material + quantity
+                    const matSelect = clone.querySelector('select[name$="-material"]');
+                    const qtyInput  = clone.querySelector('input[name$="-quantity"]');
+                    if (matSelect) matSelect.value = m.id;
+                    if (qtyInput)  qtyInput.value  = m.quantity;
+
+                    wireDeleteCheckbox(clone);
+                });
+            })
+            .catch(function (e) { console.error('delivery note materials error', e); });
+    });
+})();
+</script>
+{% endblock %}

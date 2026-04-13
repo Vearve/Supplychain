@@ -1,0 +1,55 @@
+{% extends 'SupplChain_MNG/workspace_base.html' %}
+
+{% block title %}Stock Transaction{% endblock %}
+{% block page_title %}Stock Transaction{% endblock %}
+
+{% block content %}
+<div class="panel panel-pad" style="margin-bottom: 12px;">
+    {% if can_manage_current %}
+    <a class="btn btn-primary" href="{% url 'record_create' 'stock-transactions' %}">Add Stock Transaction</a>
+    {% endif %}
+    <a class="btn btn-neutral" href="{% url 'export_records' 'stock-transactions' 'csv' %}?{{ request.GET.urlencode }}">Export CSV</a>
+    <a class="btn btn-neutral" href="{% url 'export_records' 'stock-transactions' 'excel' %}?{{ request.GET.urlencode }}">Export Excel</a>
+</div>
+<div class="panel panel-pad table-wrap">
+    <table>
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Name</th>
+                <th>Code Number</th>
+                <th>Part Number</th>
+                <th>Category</th>
+                <th>Type</th>
+                <th>Quantity</th>
+                <th>Performed By</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in rows %}
+            <tr>
+                <td>{{ item.date|date:'Y-m-d H:i' }}</td>
+                <td>{{ item.material.name|default:'Unknown' }}</td>
+                <td>{{ item.code_number_display }}</td>
+                <td>{{ item.material.part_number|default:'-' }}</td>
+                <td>{{ item.material.category.name|default:'-' }}</td>
+                <td>{{ item.get_transaction_type_display }}</td>
+                <td>{{ item.quantity }}</td>
+                <td>{{ item.performed_by.username|default:'N/A' }}</td>
+                <td>
+                    {% if can_manage_current %}
+                    <a class="btn btn-neutral btn-sm" href="{% url 'record_update' 'stock-transactions' item.id %}">Edit</a>
+                    <a class="btn btn-danger btn-sm" href="{% url 'record_delete' 'stock-transactions' item.id %}">Delete</a>
+                    {% else %}
+                    <span class="badge badge-neutral">View Only</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="9">No stock transactions found for selected filters.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

@@ -1,0 +1,105 @@
+{% extends 'SupplChain_MNG/workspace_base.html' %}
+
+{% block title %}Material Detail{% endblock %}
+{% block page_title %}Material Detail{% endblock %}
+
+{% block content %}
+<section class="split" style="margin-bottom: 12px;">
+    <div class="panel panel-pad">
+        <h2 style="margin-top: 0;">{{ material.name }}</h2>
+        <p><strong>Code Number:</strong> {{ material.code_number }}</p>
+        <p><strong>Part Number:</strong> {{ material.part_number|default:'-' }}</p>
+        <p><strong>Category:</strong> {{ material.category.name|default:'-' }}</p>
+        <p><strong>Subcategory:</strong> {{ material.subcategory.name|default:'-' }}</p>
+        <p><strong>Equipment:</strong> {{ material.equipment.name|default:'-' }}</p>
+        <p><strong>Quantity:</strong> {{ material.quantity }} {{ material.unit }}</p>
+        <p><strong>Minimum Required:</strong> {{ material.min_required }}</p>
+        <p><strong>Consumable:</strong> {% if material.is_consumable %}Yes{% else %}No{% endif %}</p>
+        <p><strong>Measurement:</strong> {{ material.get_measurement_unit_display }}</p>
+        <p><strong>Location:</strong> {{ material.location|default:'-' }}</p>
+        <p><strong>Stock Health:</strong> <span class="badge {{ stock_meta.class_name }}">{{ stock_meta.label }}</span></p>
+        {% if can_manage_current %}
+        <div style="display: flex; gap: 8px; margin-top: 12px;">
+            <a class="btn btn-primary" href="{% url 'record_update' 'materials' material.id %}">Edit</a>
+            <a class="btn btn-danger" href="{% url 'record_delete' 'materials' material.id %}">Delete</a>
+        </div>
+        {% endif %}
+    </div>
+    <div class="panel panel-pad">
+        <h3 style="margin-top: 0;">Attachments</h3>
+        {% if material.photo %}
+        <div style="margin-bottom: 12px;">
+            <a target="_blank" href="{{ material.photo.url }}">
+                <img src="{{ material.photo.url }}" alt="{{ material.name }} photo" style="max-width: 100%; border-radius: 14px; border: 1px solid #d4dfe7;">
+            </a>
+        </div>
+        {% endif %}
+        <p>
+            <strong>Document:</strong>
+            {% if material.document %}
+            <a class="btn btn-neutral btn-sm" target="_blank" href="{{ material.document.url }}">Open Document</a>
+            {% else %}
+            -
+            {% endif %}
+        </p>
+    </div>
+</section>
+
+<section class="split" style="margin-bottom: 12px;">
+    <div class="panel panel-pad table-wrap">
+        <h3 style="margin-top: 0;">Recent Stock Transactions</h3>
+        <table>
+            <thead><tr><th>Date</th><th>Type</th><th>Qty</th><th>User</th></tr></thead>
+            <tbody>
+                {% for item in recent_transactions %}
+                <tr>
+                    <td>{{ item.date|date:'Y-m-d H:i' }}</td>
+                    <td>{{ item.get_transaction_type_display }}</td>
+                    <td>{{ item.quantity }}</td>
+                    <td>{{ item.performed_by.username|default:'-' }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="4">No stock history available.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div class="panel panel-pad table-wrap">
+        <h3 style="margin-top: 0;">Recent Requisitions</h3>
+        <table>
+            <thead><tr><th>Date</th><th>Department</th><th>Qty</th><th>Status</th></tr></thead>
+            <tbody>
+                {% for item in recent_requisitions %}
+                <tr>
+                    <td>{{ item.date_requested|date:'Y-m-d' }}</td>
+                    <td>{{ item.get_department_display }}</td>
+                    <td>{{ item.quantity_requested }}</td>
+                    <td>{% if item.fulfilled %}Fulfilled{% else %}Pending{% endif %}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="4">No requisition history available.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section class="panel panel-pad table-wrap">
+    <h3 style="margin-top: 0;">Return History</h3>
+    <table>
+        <thead><tr><th>Date</th><th>Project/Site</th><th>Quantity</th><th>Returned By</th></tr></thead>
+        <tbody>
+            {% for item in recent_returns %}
+            <tr>
+                <td>{{ item.date_returned|date:'Y-m-d' }}</td>
+                <td>{{ item.project.name|default:'-' }}</td>
+                <td>{{ item.quantity_returned }}</td>
+                <td>{{ item.returned_by.username|default:'-' }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="4">No return history available.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endblock %}

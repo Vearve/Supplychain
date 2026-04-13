@@ -1,0 +1,147 @@
+{% extends 'SupplChain_MNG/workspace_base.html' %}
+
+{% block title %}Inventory Setup{% endblock %}
+{% block page_title %}Inventory Setup{% endblock %}
+
+{% block content %}
+<section class="cards" style="margin-bottom: 12px;">
+    <article class="metric"><div class="label">Active Stores</div><div class="value">{{ active_store_count }}</div></article>
+    <article class="metric"><div class="label">Active Bins</div><div class="value">{{ active_bin_count }}</div></article>
+    <article class="metric"><div class="label">Stock Lines</div><div class="value">{{ stock_line_count }}</div></article>
+    <article class="metric"><div class="label">Total Reserved</div><div class="value">{{ reserved_total }}</div></article>
+</section>
+
+<div class="panel panel-pad" style="margin-bottom: 12px; display: flex; gap: 8px; flex-wrap: wrap;">
+    <a class="btn btn-neutral" href="{% url 'settings' %}">← Back to Settings</a>
+    {% if can_manage_current %}
+    <a class="btn btn-primary" href="{% url 'record_create' 'store-locations' %}">Add Store Location</a>
+    <a class="btn btn-primary" href="{% url 'record_create' 'storage-bins' %}">Add BIN</a>
+    <a class="btn btn-primary" href="{% url 'record_create' 'inventory-balances' %}">Set Inventory Balance</a>
+    {% if can_access_scope_admin %}
+    <a class="btn btn-primary" href="{% url 'record_create' 'user-store-scopes' %}">Assign User Store Scope</a>
+    {% endif %}
+    {% endif %}
+    <a class="btn btn-neutral" href="{% url 'export_records' 'store-locations' 'csv' %}">Stores CSV</a>
+    <a class="btn btn-neutral" href="{% url 'export_records' 'storage-bins' 'csv' %}">Bins CSV</a>
+    <a class="btn btn-neutral" href="{% url 'export_records' 'inventory-balances' 'excel' %}">Balances Excel</a>
+</div>
+
+<section class="split" style="margin-bottom: 12px;">
+    <div class="panel panel-pad table-wrap">
+        <h3 style="margin-top: 0;">Store Locations</h3>
+        <table>
+            <thead><tr><th>Name</th><th>Type</th><th>Project/Site</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody>
+                {% for item in store_rows %}
+                <tr>
+                    <td>{{ item.name }}</td>
+                    <td>{{ item.get_location_type_display }}</td>
+                    <td>{{ item.project.name|default:'-' }}</td>
+                    <td>{% if item.is_active %}<span class="badge badge-ok">Active</span>{% else %}<span class="badge badge-neutral">Inactive</span>{% endif %}</td>
+                    <td>
+                        {% if can_manage_current %}
+                        <a class="btn btn-neutral btn-sm" href="{% url 'record_update' 'store-locations' item.id %}">Edit</a>
+                        <a class="btn btn-danger btn-sm" href="{% url 'record_delete' 'store-locations' item.id %}">Delete</a>
+                        {% else %}
+                        <span class="badge badge-neutral">View Only</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="5">No store locations found.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="panel panel-pad table-wrap">
+        <h3 style="margin-top: 0;">Storage BINs</h3>
+        <table>
+            <thead><tr><th>Store</th><th>BIN</th><th>Zone/Aisle/Rack/Shelf</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody>
+                {% for item in bin_rows %}
+                <tr>
+                    <td>{{ item.store_location.name }}</td>
+                    <td>{{ item.bin_code }}</td>
+                    <td>
+                        {{ item.zone|default:'-' }} / {{ item.aisle|default:'-' }} / {{ item.rack|default:'-' }} / {{ item.shelf|default:'-' }}
+                    </td>
+                    <td>{% if item.is_active %}<span class="badge badge-ok">Active</span>{% else %}<span class="badge badge-neutral">Inactive</span>{% endif %}</td>
+                    <td>
+                        {% if can_manage_current %}
+                        <a class="btn btn-neutral btn-sm" href="{% url 'record_update' 'storage-bins' item.id %}">Edit</a>
+                        <a class="btn btn-danger btn-sm" href="{% url 'record_delete' 'storage-bins' item.id %}">Delete</a>
+                        {% else %}
+                        <span class="badge badge-neutral">View Only</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="5">No bins found.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section class="panel panel-pad table-wrap" style="margin-bottom: 12px;">
+    <h3 style="margin-top: 0;">Inventory Balances by BIN</h3>
+    <table>
+        <thead><tr><th>Material</th><th>Code</th><th>Store</th><th>BIN</th><th>On Hand</th><th>Reserved</th><th>Actions</th></tr></thead>
+        <tbody>
+            {% for item in balance_rows %}
+            <tr>
+                <td>{{ item.material.name }}</td>
+                <td>{{ item.material.code_number }}</td>
+                <td>{{ item.storage_bin.store_location.name }}</td>
+                <td>{{ item.storage_bin.bin_code }}</td>
+                <td>{{ item.on_hand }}</td>
+                <td>{{ item.reserved }}</td>
+                <td>
+                    {% if can_manage_current %}
+                    <a class="btn btn-neutral btn-sm" href="{% url 'record_update' 'inventory-balances' item.id %}">Edit</a>
+                    <a class="btn btn-danger btn-sm" href="{% url 'record_delete' 'inventory-balances' item.id %}">Delete</a>
+                    {% else %}
+                    <span class="badge badge-neutral">View Only</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="7">No inventory balances yet.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+
+<section class="panel panel-pad table-wrap" style="margin-bottom: 12px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:8px;">
+        <h3 style="margin:0;">User Store Scope</h3>
+        {% if can_access_scope_admin %}
+        <a class="btn btn-neutral btn-sm" href="{% url 'store_scope' %}">Open Full Scope Manager</a>
+        {% endif %}
+    </div>
+    <table>
+        <thead><tr><th>User</th><th>Store</th><th>Can Manage</th><th>Actions</th></tr></thead>
+        <tbody>
+            {% for item in scope_rows %}
+            <tr>
+                <td>{{ item.user.username }}</td>
+                <td>{{ item.store_location.name }}</td>
+                <td>{% if item.can_manage %}<span class="badge badge-ok">Yes</span>{% else %}<span class="badge badge-neutral">No</span>{% endif %}</td>
+                <td>
+                    {% if can_access_scope_admin %}
+                    <a class="btn btn-neutral btn-sm" href="{% url 'record_update' 'user-store-scopes' item.id %}">Edit</a>
+                    <a class="btn btn-danger btn-sm" href="{% url 'record_delete' 'user-store-scopes' item.id %}">Delete</a>
+                    {% else %}
+                    <span class="badge badge-neutral">View Only</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="4">No store scope assignments yet.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+
+{% endblock %}

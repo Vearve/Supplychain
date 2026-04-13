@@ -1,0 +1,40 @@
+{% extends 'SupplChain_MNG/workspace_base.html' %}
+
+{% block title %}Audit Log{% endblock %}
+{% block page_title %}Audit Log{% endblock %}
+
+{% block content %}
+<div class="panel panel-pad" style="margin-bottom:12px;">
+    <h3 style="margin-top:0;">Recent Activity</h3>
+    <p style="margin-top:0; color:#5e7384;">Latest 200 tracked actions across inventory, fleet, delivery notes, and role management.</p>
+</div>
+
+<div class="panel panel-pad table-wrap">
+    <table>
+        <thead>
+            <tr>
+                <th>Timestamp</th>
+                <th>User</th>
+                <th>Action</th>
+                <th>Entity</th>
+                <th>Entity ID</th>
+                <th>Details</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in rows %}
+            <tr>
+                <td>{{ item.created_at|date:'Y-m-d H:i:s' }}</td>
+                <td>{{ item.user.username|default:'-' }}</td>
+                <td><span class="badge badge-neutral">{{ item.action }}</span></td>
+                <td>{{ item.entity }}</td>
+                <td>{{ item.entity_id|default:'-' }}</td>
+                <td>{{ item.description|default:'-' }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="6">No audit entries yet.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

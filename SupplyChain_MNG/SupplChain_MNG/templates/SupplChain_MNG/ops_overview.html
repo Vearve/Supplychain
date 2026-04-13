@@ -1,0 +1,24 @@
+{% extends 'SupplChain_MNG/workspace_base.html' %}
+
+{% block title %}Ops Overview{% endblock %}
+{% block page_title %}Operations Overview{% endblock %}
+
+{% block content %}
+<section class="cards" style="margin-bottom: 12px;">
+    <article class="metric"><div class="label">Active Stores</div><div class="value">{{ active_store_count }}</div></article>
+    <article class="metric"><div class="label">Stock Lines</div><div class="value">{{ stock_line_count }}</div></article>
+    <article class="metric"><div class="label">Reserved Total</div><div class="value">{{ reserved_total }}</div></article>
+    <article class="metric"><div class="label">Posted Goods Received</div><div class="value">{{ goods_received_posted }}</div></article>
+    <article class="metric"><div class="label">Posted Goods Issue</div><div class="value">{{ goods_issue_posted }}</div></article>
+    <article class="metric"><div class="label">Posted Goods Returns</div><div class="value">{{ goods_returns_posted }}</div></article>
+    <article class="metric"><div class="label">Posted PPE Issues</div><div class="value">{{ ppe_issues_posted }}</div></article>
+    <article class="metric"><div class="label">Delivery Dispatched</div><div class="value">{{ delivery_dispatched }}</div></article>
+    <article class="metric"><div class="label">Pending Requisitions</div><div class="value">{{ pending_requisitions }}</div></article>
+    <article class="metric"><div class="label">Equipment Linked To Stores</div><div class="value">{{ equipment_linked_count }}</div></article>
+    <article class="metric"><div class="label">Fleet Linked To Stores</div><div class="value">{{ fleet_linked_count }}</div></article>
+</section>
+
+<div class="panel panel-pad">
+    <p style="margin:0; color:#5e7384;">This overview is scope-aware. Operations Manager sees all stores; scoped users see only assigned stores.</p>
+</div>
+{% endblock %}

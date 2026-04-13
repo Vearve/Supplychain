@@ -1,0 +1,84 @@
+{% extends 'SupplChain_MNG/workspace_base.html' %}
+
+{% block title %}Equipment Detail{% endblock %}
+{% block page_title %}Equipment Detail{% endblock %}
+
+{% block content %}
+<section class="split" style="margin-bottom: 12px;">
+    <div class="panel panel-pad">
+        <h2 style="margin-top: 0;">{{ equipment.name }}</h2>
+        <p><strong>Serial Number:</strong> {{ equipment.serial_number|default:'-' }}</p>
+        <p><strong>Category:</strong> {{ equipment.subcategory.category.name|default:'-' }}</p>
+        <p><strong>Subcategory:</strong> {{ equipment.subcategory.name|default:'-' }}</p>
+        <p><strong>Project/Site:</strong> {{ equipment.project.name|default:'-' }}</p>
+        <p><strong>Location:</strong> {{ equipment.location|default:'-' }}</p>
+        <p><strong>Status:</strong> {{ equipment.get_status_display }}</p>
+        <p><strong>Purchase Date:</strong> {{ equipment.purchase_date|date:'Y-m-d'|default:'-' }}</p>
+        <p><strong>Service Due:</strong> {{ equipment.service_due_date|date:'Y-m-d'|default:'-' }} <span class="badge {{ service_due_meta.class_name }}">{{ service_due_meta.label }}</span></p>
+        <p><strong>Notes:</strong> {{ equipment.notes|default:'-' }}</p>
+        {% if can_manage_current %}
+        <div style="display: flex; gap: 8px; margin-top: 12px;">
+            <a class="btn btn-primary" href="{% url 'record_update' 'equipment' equipment.id %}">Edit</a>
+            <a class="btn btn-danger" href="{% url 'record_delete' 'equipment' equipment.id %}">Delete</a>
+        </div>
+        {% endif %}
+    </div>
+    <div class="panel panel-pad">
+        <h3 style="margin-top: 0;">Attachments</h3>
+        {% if equipment.photo %}
+        <div style="margin-bottom: 12px;">
+            <a target="_blank" href="{{ equipment.photo.url }}">
+                <img src="{{ equipment.photo.url }}" alt="{{ equipment.name }} photo" style="max-width: 100%; border-radius: 14px; border: 1px solid #d4dfe7;">
+            </a>
+        </div>
+        {% endif %}
+        <p>
+            <strong>Document:</strong>
+            {% if equipment.document %}
+            <a class="btn btn-neutral btn-sm" target="_blank" href="{{ equipment.document.url }}">Open Document</a>
+            {% else %}
+            -
+            {% endif %}
+        </p>
+    </div>
+</section>
+
+<section class="split" style="margin-bottom: 12px;">
+    <div class="panel panel-pad table-wrap">
+        <h3 style="margin-top: 0;">Linked Materials</h3>
+        <table>
+            <thead><tr><th>Name</th><th>Code Number</th><th>Category</th><th>Qty</th></tr></thead>
+            <tbody>
+                {% for item in linked_materials %}
+                <tr>
+                    <td><a href="{% url 'material_detail' item.id %}">{{ item.name }}</a></td>
+                    <td>{{ item.code_number }}</td>
+                    <td>{{ item.category.name|default:'-' }}</td>
+                    <td>{{ item.quantity }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="4">No linked materials.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div class="panel panel-pad table-wrap">
+        <h3 style="margin-top: 0;">Recent Related Transactions</h3>
+        <table>
+            <thead><tr><th>Date</th><th>Material</th><th>Type</th><th>Qty</th></tr></thead>
+            <tbody>
+                {% for item in recent_related_transactions %}
+                <tr>
+                    <td>{{ item.date|date:'Y-m-d H:i' }}</td>
+                    <td>{{ item.material.name|default:'-' }}</td>
+                    <td>{{ item.get_transaction_type_display }}</td>
+                    <td>{{ item.quantity }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="4">No transaction history available.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

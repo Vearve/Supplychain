@@ -1,0 +1,73 @@
+{% extends 'SupplChain_MNG/workspace_base.html' %}
+
+{% block title %}PPE Issues{% endblock %}
+{% block page_title %}PPE Issues{% endblock %}
+
+{% block content %}
+<div class="panel panel-pad" style="margin-bottom: 12px; display: flex; gap: 8px; flex-wrap: wrap;">
+    {% if project_context %}
+    <a class="btn btn-neutral" href="{% url 'project_manage' project_context.id %}">← Projects / Sites{% if project_context.location %} · Location: {{ project_context.location }}{% else %} · {{ project_context.name }}{% endif %}</a>
+    {% endif %}
+    {% if can_manage_current %}
+    <a class="btn btn-primary" href="{% url 'ppe_issues_create' %}{% if project_context %}?project={{ project_context.id }}{% endif %}">Create PPE Issue</a>
+    {% endif %}
+</div>
+
+<div class="panel panel-pad table-wrap">
+    <table>
+        <thead>
+            <tr>
+                <th>Issue No</th>
+                <th>Date</th>
+                <th>Store</th>
+                <th>Employee</th>
+                <th>Type</th>
+                <th>Reason</th>
+                <th>Items</th>
+                <th>Total Qty</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in rows %}
+            <tr>
+                <td>{{ item.issue_number }}</td>
+                <td>{{ item.date_issued|date:'Y-m-d' }}</td>
+                <td>{{ item.store_location.name }}</td>
+                <td>{{ item.employee_name }}{% if item.employee_number %} ({{ item.employee_number }}){% endif %}</td>
+                <td>{{ item.get_issue_type_display }}</td>
+                <td>{{ item.get_reason_display }}</td>
+                <td>{{ item.item_count }}</td>
+                <td>{{ item.total_quantity }}</td>
+                <td>
+                    {% if item.status == 'POSTED' %}
+                    <span class="badge badge-ok">{{ item.get_status_display }}</span>
+                    {% else %}
+                    <span class="badge badge-neutral">{{ item.get_status_display }}</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if can_manage_current %}
+                    <a class="btn btn-neutral btn-sm" href="{% url 'ppe_issues_update' item.id %}">Edit</a>
+                    <a class="btn btn-danger btn-sm" href="{% url 'ppe_issues_delete' item.id %}">Delete</a>
+                    {% if item.status == 'DRAFT' %}
+                    <form method="post" style="display:inline;">
+                        {% csrf_token %}
+                        <input type="hidden" name="ppe_id" value="{{ item.id }}">
+                        <input type="hidden" name="action" value="post">
+                        <button type="submit" class="btn btn-primary btn-sm">Post</button>
+                    </form>
+                    {% endif %}
+                    {% else %}
+                    <span class="badge badge-neutral">View Only</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="10">No PPE issues found.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

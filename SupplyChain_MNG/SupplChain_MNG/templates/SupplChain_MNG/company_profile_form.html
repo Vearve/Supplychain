@@ -1,0 +1,33 @@
+{% extends 'SupplChain_MNG/workspace_base.html' %}
+
+{% block title %}Company Profile{% endblock %}
+{% block page_title %}Company Profile{% endblock %}
+
+{% block content %}
+<div class="panel panel-pad" style="max-width: 900px;">
+    <h3 style="margin-top:0;">Delivery Note Branding</h3>
+    <p style="margin-top:0; color:#5e7384;">Set the default company identity used on newly created delivery notes.</p>
+
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+            {% for field in form %}
+            {% if field.name == 'address' %}
+            <div style="grid-column:1 / -1;">
+            {% else %}
+            <div>
+            {% endif %}
+                <label style="font-size:0.9rem; font-weight:600; display:block; margin-bottom:4px;">{{ field.label }}</label>
+                {{ field }}
+                {% for error in field.errors %}<div style="color:#b21f35; font-size:0.85rem;">{{ error }}</div>{% endfor %}
+            </div>
+            {% endfor %}
+        </div>
+
+        <div style="margin-top:14px; display:flex; gap:8px;">
+            <button class="btn btn-primary" type="submit">Save Profile</button>
+            <a class="btn btn-neutral" href="{% url 'delivery_notes' %}">Back to Delivery Notes</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

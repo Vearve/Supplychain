@@ -1,0 +1,84 @@
+{% extends 'SupplChain_MNG/workspace_base.html' %}
+
+{% block title %}Projects and Sites{% endblock %}
+{% block page_title %}Projects / Sites{% endblock %}
+
+{% block content %}
+<style>
+    .project-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 14px;
+    }
+
+    .project-card {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 16px;
+    }
+
+    .project-title {
+        margin: 0 0 4px;
+        font-size: 1.05rem;
+    }
+
+    .project-meta {
+        color: var(--muted);
+        font-size: 0.88rem;
+        margin-bottom: 10px;
+    }
+
+    .project-stats {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        margin: 10px 0 12px;
+    }
+
+    .project-stat {
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 8px;
+        font-size: 0.86rem;
+    }
+
+    .project-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+</style>
+
+<div class="panel panel-pad" style="margin-bottom: 12px;">
+    {% if can_manage_current %}
+    <a class="btn btn-primary" href="{% url 'record_create' 'projects' %}">Add Project / Site</a>
+    {% endif %}
+    <a class="btn btn-neutral" href="{% url 'export_records' 'projects' 'csv' %}?{{ request.GET.urlencode }}">Export CSV</a>
+    <a class="btn btn-neutral" href="{% url 'export_records' 'projects' 'excel' %}?{{ request.GET.urlencode }}">Export Excel</a>
+</div>
+<div class="project-grid">
+    {% for item in rows %}
+    <article class="project-card">
+        <h3 class="project-title">{{ item.name }}</h3>
+        <div class="project-meta">{{ item.location|default:'No location set' }}</div>
+        <div class="project-meta">{{ item.description|default:'No description' }}</div>
+
+        <div class="project-stats">
+            <div class="project-stat"><strong>Requisitions</strong><div>{{ item.requisition_count }}</div></div>
+            <div class="project-stat"><strong>Returns</strong><div>{{ item.returns_count }}</div></div>
+        </div>
+
+        <div class="project-actions">
+            <a class="btn btn-primary btn-sm" href="{% url 'project_manage' item.id %}">Manage</a>
+            {% if can_manage_current %}
+            <a class="btn btn-neutral btn-sm" href="{% url 'record_update' 'projects' item.id %}">Edit</a>
+            <a class="btn btn-danger btn-sm" href="{% url 'record_delete' 'projects' item.id %}">Delete</a>
+            {% endif %}
+        </div>
+    </article>
+    {% empty %}
+    <div class="panel panel-pad">No projects/sites available.</div>
+    {% endfor %}
+</div>
+{% endblock %}

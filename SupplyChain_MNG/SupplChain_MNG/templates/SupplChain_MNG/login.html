@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Supply Chain Login</title>
+    <style>
+        :root {
+            --bg-1: #f2efe9;
+            --bg-2: #d9e2ec;
+            --card: #ffffff;
+            --text: #1c2a34;
+            --muted: #6b7f90;
+            --accent: #145374;
+            --accent-2: #5588a3;
+            --danger: #b11f3a;
+            --line: #d7e0e7;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: grid;
+            place-items: center;
+            font-family: "Segoe UI", "Trebuchet MS", sans-serif;
+            color: var(--text);
+            background:
+                radial-gradient(circle at 10% 10%, #ffffffaa 0, #ffffff00 40%),
+                radial-gradient(circle at 90% 90%, #9ec5d533 0, #9ec5d500 45%),
+                linear-gradient(135deg, var(--bg-1), var(--bg-2));
+        }
+
+        .login-card {
+            width: min(92vw, 440px);
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: 18px;
+            box-shadow: 0 20px 45px #0f24330f;
+            padding: 30px;
+            animation: rise 0.35s ease-out;
+        }
+
+        @keyframes rise {
+            from { opacity: 0; transform: translateY(18px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        h1 {
+            margin: 0 0 8px;
+            font-size: 1.55rem;
+            letter-spacing: 0.2px;
+        }
+
+        .subtitle {
+            margin: 0 0 24px;
+            color: var(--muted);
+            font-size: 0.95rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        input[type="text"],
+        input[type="password"] {
+            width: 100%;
+            padding: 11px 12px;
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            margin-bottom: 14px;
+            font-size: 0.95rem;
+            background: #fbfdff;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: var(--accent-2);
+            box-shadow: 0 0 0 3px #5588a326;
+        }
+
+        .errorlist {
+            margin: 0 0 12px;
+            padding: 10px 12px;
+            list-style: none;
+            border-radius: 10px;
+            background: #fdecee;
+            color: var(--danger);
+            border: 1px solid #f2c4cc;
+            font-size: 0.9rem;
+        }
+
+        button {
+            width: 100%;
+            border: none;
+            border-radius: 10px;
+            background: linear-gradient(90deg, var(--accent), var(--accent-2));
+            color: white;
+            padding: 11px;
+            font-weight: 700;
+            cursor: pointer;
+            margin-top: 6px;
+        }
+
+        button:hover { filter: brightness(1.05); }
+
+        .helper {
+            margin-top: 14px;
+            color: var(--muted);
+            font-size: 0.86rem;
+        }
+    </style>
+</head>
+<body>
+    <main class="login-card">
+        <h1>Supply Chain Workspace</h1>
+        <p class="subtitle">Sign in to access materials, requisitions, projects, and analytics.</p>
+
+        <form method="post">
+            {% csrf_token %}
+            {{ form.non_field_errors }}
+
+            <label for="id_username">Username</label>
+            {{ form.username }}
+
+            <label for="id_password">Password</label>
+            {{ form.password }}
+
+            <button type="submit">Sign In</button>
+        </form>
+
+        <p class="helper">Use your admin/superuser account credentials.</p>
+    </main>
+</body>
+</html>

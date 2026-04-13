@@ -1,0 +1,349 @@
+{% extends 'SupplChain_MNG/workspace_base.html' %}
+
+{% block title %}Manage — {{ project.name }}{% endblock %}
+{% block page_title %}{{ project.name }} — Manage{% endblock %}
+
+{% block head_extra %}
+<style>
+    .manage-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+    }
+
+    .manage-back {
+        font-size: 0.88rem;
+        color: var(--muted);
+        text-decoration: none;
+    }
+
+    .manage-back:hover { color: var(--brand); }
+
+    .manage-meta {
+        font-size: 0.88rem;
+        color: var(--muted);
+    }
+
+    .section-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        margin: 20px 0 8px;
+    }
+
+    .section-header h2 {
+        margin: 0;
+        font-size: 1.05rem;
+        color: #335164;
+    }
+
+    .metric-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: 10px;
+        margin-bottom: 18px;
+    }
+
+    .doc-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.88rem;
+    }
+
+    .doc-table th, .doc-table td {
+        padding: 8px 7px;
+        border-bottom: 1px solid #e6edf3;
+        vertical-align: top;
+        text-align: left;
+    }
+
+    .doc-table th {
+        background: #f3f7fa;
+        color: #335164;
+        font-size: 0.82rem;
+    }
+
+    .stores-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-bottom: 18px;
+    }
+
+    .store-chip {
+        background: #e6f4fb;
+        color: #1a547a;
+        border: 1px solid #b8ddf0;
+        border-radius: 999px;
+        padding: 4px 10px;
+        font-size: 0.82rem;
+        font-weight: 600;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="manage-header">
+    <div>
+        <a class="manage-back" href="{% url 'projects' %}">← Projects / Sites</a>
+        <div class="manage-meta" style="margin-top:4px;">
+            {% if project.location %}Location: {{ project.location }}{% endif %}
+            {% if project.description %} · {{ project.description }}{% endif %}
+        </div>
+    </div>
+    {% if can_manage_current %}
+    <a class="btn btn-primary" href="{% url 'project_requisition_create' project.id %}">+ New Requisition</a>
+    {% endif %}
+</div>
+
+<!-- Summary metrics -->
+<div class="metric-row">
+    <div class="metric">
+        <div class="label">Stores / Sites</div>
+        <div class="value">{{ project_stores.count }}</div>
+    </div>
+    <div class="metric">
+        <div class="label">Goods Received</div>
+        <div class="value">{{ receipt_count }}</div>
+    </div>
+    <div class="metric">
+        <div class="label">Goods Issued</div>
+        <div class="value">{{ issue_count }}</div>
+    </div>
+    <div class="metric">
+        <div class="label">Goods Returns</div>
+        <div class="value">{{ return_count }}</div>
+    </div>
+    <div class="metric">
+        <div class="label">PPE Issues</div>
+        <div class="value">{{ ppe_count }}</div>
+    </div>
+    <div class="metric">
+        <div class="label">Requisitions</div>
+        <div class="value">{{ req_count }}</div>
+    </div>
+</div>
+
+<!-- Linked stores -->
+{% if project_stores %}
+<div class="panel panel-pad" style="margin-bottom: 16px;">
+    <strong style="font-size:0.9rem; color:var(--ink);">Linked Store Locations</strong>
+    <div class="stores-list" style="margin-top:8px;">
+        {% for store in project_stores %}
+        <span class="store-chip">{{ store.name }}{% if store.location_type %} · {{ store.get_location_type_display }}{% endif %}</span>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<!-- Requisitions -->
+<div class="section-header">
+    <h2>Requisitions</h2>
+    <div style="display:flex; gap:8px;">
+        {% if can_manage_current %}
+        <a class="btn btn-primary btn-sm" href="{% url 'project_requisition_create' project.id %}">+ New</a>
+        {% endif %}
+        <a class="btn btn-neutral btn-sm" href="{% url 'requisitions' %}?project={{ project.id }}">View All</a>
+    </div>
+</div>
+<div class="panel panel-pad table-wrap" style="margin-bottom:20px;">
+    {% if recent_reqs %}
+    <table class="doc-table">
+        <thead>
+            <tr>
+                <th>Ref #</th>
+                <th>Date</th>
+                <th>Department</th>
+                <th>Items</th>
+                <th>Status</th>
+                <th>Requested By</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for req in recent_reqs %}
+            <tr>
+                <td>{{ req.req_number|default:req.id }}</td>
+                <td>{{ req.date_requested|date:"d M Y" }}</td>
+                <td>{{ req.department|default:'-' }}</td>
+                <td>{{ req.items.count }}</td>
+                <td><span class="badge badge-neutral">{{ req.status }}</span></td>
+                <td>{{ req.requested_by.username|default:'-' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p style="color:var(--muted); margin:0;">No requisitions for this project yet.</p>
+    {% endif %}
+</div>
+
+<!-- Goods Received -->
+<div class="section-header">
+    <h2>Goods Received</h2>
+    <div style="display:flex; gap:8px;">
+        {% if can_manage_current %}
+        <a class="btn btn-primary btn-sm" href="{% url 'goods_received_create' %}?project={{ project.id }}">+ New</a>
+        {% endif %}
+        <a class="btn btn-neutral btn-sm" href="{% url 'goods_received' %}?project={{ project.id }}">View All</a>
+    </div>
+</div>
+<div class="panel panel-pad table-wrap" style="margin-bottom:20px;">
+    {% if recent_receipts %}
+    <table class="doc-table">
+        <thead>
+            <tr>
+                <th>Receipt #</th>
+                <th>Date</th>
+                <th>Store</th>
+                <th>Items</th>
+                <th>Total Qty</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for r in recent_receipts %}
+            <tr>
+                <td>{{ r.receipt_number }}</td>
+                <td>{{ r.created_at|date:"d M Y" }}</td>
+                <td>{{ r.destination_store.name|default:'-' }}</td>
+                <td>{{ r.item_count }}</td>
+                <td>{{ r.total_qty }}</td>
+                <td><span class="badge badge-{% if r.status == 'POSTED' %}ok{% else %}neutral{% endif %}">{{ r.status }}</span></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p style="color:var(--muted); margin:0;">No goods receipts for this project yet.</p>
+    {% endif %}
+</div>
+
+<!-- Goods Issue -->
+<div class="section-header">
+    <h2>Goods Issue</h2>
+    <div style="display:flex; gap:8px;">
+        {% if can_manage_current %}
+        <a class="btn btn-primary btn-sm" href="{% url 'goods_issue_create' %}?project={{ project.id }}">+ New</a>
+        {% endif %}
+        <a class="btn btn-neutral btn-sm" href="{% url 'goods_issue' %}?project={{ project.id }}">View All</a>
+    </div>
+</div>
+<div class="panel panel-pad table-wrap" style="margin-bottom:20px;">
+    {% if recent_issues %}
+    <table class="doc-table">
+        <thead>
+            <tr>
+                <th>Issue #</th>
+                <th>Date</th>
+                <th>Store</th>
+                <th>Items</th>
+                <th>Total Qty</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for r in recent_issues %}
+            <tr>
+                <td>{{ r.issue_number }}</td>
+                <td>{{ r.created_at|date:"d M Y" }}</td>
+                <td>{{ r.source_store.name|default:'-' }}</td>
+                <td>{{ r.item_count }}</td>
+                <td>{{ r.total_qty }}</td>
+                <td><span class="badge badge-{% if r.status == 'POSTED' %}ok{% else %}neutral{% endif %}">{{ r.status }}</span></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p style="color:var(--muted); margin:0;">No goods issues for this project yet.</p>
+    {% endif %}
+</div>
+
+<!-- Goods Returns -->
+<div class="section-header">
+    <h2>Goods Returns</h2>
+    <div style="display:flex; gap:8px;">
+        {% if can_manage_current %}
+        <a class="btn btn-primary btn-sm" href="{% url 'goods_returns_create' %}?project={{ project.id }}">+ New</a>
+        {% endif %}
+        <a class="btn btn-neutral btn-sm" href="{% url 'goods_returns' %}?project={{ project.id }}">View All</a>
+    </div>
+</div>
+<div class="panel panel-pad table-wrap" style="margin-bottom:20px;">
+    {% if recent_returns %}
+    <table class="doc-table">
+        <thead>
+            <tr>
+                <th>Return #</th>
+                <th>Date</th>
+                <th>Destination</th>
+                <th>From</th>
+                <th>Items</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for r in recent_returns %}
+            <tr>
+                <td>{{ r.return_number }}</td>
+                <td>{{ r.created_at|date:"d M Y" }}</td>
+                <td>{{ r.destination_store.name|default:'-' }}</td>
+                <td>{{ r.from_store.name|default:'-' }}</td>
+                <td>{{ r.item_count }}</td>
+                <td><span class="badge badge-{% if r.status == 'POSTED' %}ok{% else %}neutral{% endif %}">{{ r.status }}</span></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p style="color:var(--muted); margin:0;">No goods returns for this project yet.</p>
+    {% endif %}
+</div>
+
+<!-- PPE Issues -->
+<div class="section-header">
+    <h2>PPE Issues</h2>
+    <div style="display:flex; gap:8px;">
+        {% if can_manage_current %}
+        <a class="btn btn-primary btn-sm" href="{% url 'ppe_issues_create' %}?project={{ project.id }}">+ New</a>
+        {% endif %}
+        <a class="btn btn-neutral btn-sm" href="{% url 'ppe_issues' %}?project={{ project.id }}">View All</a>
+    </div>
+</div>
+<div class="panel panel-pad table-wrap" style="margin-bottom:20px;">
+    {% if recent_ppe %}
+    <table class="doc-table">
+        <thead>
+            <tr>
+                <th>Issue #</th>
+                <th>Date</th>
+                <th>Employee</th>
+                <th>Store</th>
+                <th>Items</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for r in recent_ppe %}
+            <tr>
+                <td>{{ r.issue_number }}</td>
+                <td>{{ r.created_at|date:"d M Y" }}</td>
+                <td>{{ r.employee_name|default:'-' }}</td>
+                <td>{{ r.store_location.name|default:'-' }}</td>
+                <td>{{ r.item_count }}</td>
+                <td><span class="badge badge-{% if r.status == 'POSTED' %}ok{% else %}neutral{% endif %}">{{ r.status }}</span></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p style="color:var(--muted); margin:0;">No PPE issues for this project yet.</p>
+    {% endif %}
+</div>
+
+{% endblock %}
