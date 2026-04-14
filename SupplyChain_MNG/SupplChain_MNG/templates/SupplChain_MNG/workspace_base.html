@@ -214,6 +214,19 @@
             border-bottom: 1px solid #dde7ef;
         }
 
+        .topbar-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .menu-trigger {
+            display: none;
+            color: #12384a;
+            border-color: #8daec0;
+            background: #eaf3f8;
+        }
+
         .topbar-actions {
             display: flex;
             align-items: center;
@@ -462,6 +475,12 @@
             background: #1b2a36;
         }
 
+        html[data-theme='dark'] .menu-trigger {
+            color: #d1e0eb;
+            border-color: #3f586c;
+            background: #1b2a36;
+        }
+
         html[data-theme='dark'] .filter-dropdown {
             background: #16222d;
             border-color: #2b3e4e;
@@ -562,13 +581,36 @@
             color: #8a5600;
         }
 
+        .sidebar-overlay {
+            position: fixed;
+            inset: 0;
+            background: #0a141b80;
+            z-index: 28;
+            display: none;
+        }
+
+        body.sidebar-open .sidebar-overlay {
+            display: block;
+        }
+
         @media (max-width: 1080px) {
             .layout { grid-template-columns: 1fr; }
             .sidebar {
-                position: static;
-                height: auto;
-                border-bottom: 1px solid #2f4e61;
+                position: fixed;
+                left: 0;
+                top: 0;
+                height: 100vh;
+                width: min(300px, 86vw);
+                border-right: 1px solid #2f4e61;
+                border-bottom: none;
+                z-index: 30;
+                transform: translateX(-100%);
+                transition: transform 0.22s ease;
             }
+            body.sidebar-open .sidebar { transform: translateX(0); }
+            body.sidebar-open { overflow: hidden; }
+            .content { padding: 16px; }
+            .menu-trigger { display: inline-flex; }
             .split { grid-template-columns: 1fr; }
         }
     </style>
@@ -605,9 +647,19 @@
 
         <main class="content">
             <header class="topbar">
-                <div class="title">
-                    <h1>{% block page_title %}Workspace{% endblock %}</h1>
-                    <p>Welcome, {{ request.user.username }}. Track operational movement and stock health.</p>
+                <div class="topbar-left">
+                    <button type="button" class="btn icon-btn menu-trigger" id="sidebar-toggle" title="Open menu" aria-label="Open navigation menu" aria-controls="workspace-sidebar" aria-expanded="false">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M3 6h18" />
+                            <path d="M3 12h18" />
+                            <path d="M3 18h18" />
+                        </svg>
+                        <span class="sr-only">Open menu</span>
+                    </button>
+                    <div class="title">
+                        <h1>{% block page_title %}Workspace{% endblock %}</h1>
+                        <p>Welcome, {{ request.user.username }}. Track operational movement and stock health.</p>
+                    </div>
                 </div>
 
                 <div class="topbar-actions">
@@ -689,9 +741,50 @@
             {% block content %}{% endblock %}
         </main>
     </div>
+    <div class="sidebar-overlay" id="sidebar-overlay"></div>
     <div class="filter-overlay" id="filter-overlay"></div>
     <script>
     (function () {
+        const sidebarToggle = document.getElementById('sidebar-toggle');
+        const sidebar = document.querySelector('.sidebar');
+        const sidebarOverlay = document.getElementById('sidebar-overlay');
+
+        function closeSidebar() {
+            document.body.classList.remove('sidebar-open');
+            if (sidebarToggle) sidebarToggle.setAttribute('aria-expanded', 'false');
+        }
+
+        function openSidebar() {
+            document.body.classList.add('sidebar-open');
+            if (sidebarToggle) sidebarToggle.setAttribute('aria-expanded', 'true');
+        }
+
+        if (sidebarToggle && sidebar && sidebarOverlay) {
+            sidebarToggle.addEventListener('click', function () {
+                if (document.body.classList.contains('sidebar-open')) {
+                    closeSidebar();
+                } else {
+                    openSidebar();
+                }
+            });
+
+            sidebarOverlay.addEventListener('click', closeSidebar);
+
+            sidebar.querySelectorAll('a').forEach(function (link) {
+                link.addEventListener('click', function () {
+                    if (window.matchMedia('(max-width: 1080px)').matches) {
+                        closeSidebar();
+                    }
+                });
+            });
+
+            window.addEventListener('resize', function () {
+                if (!window.matchMedia('(max-width: 1080px)').matches) {
+                    closeSidebar();
+                }
+            });
+        }
+
         const themeToggle = document.getElementById('theme-toggle');
         const root = document.documentElement;
 
@@ -720,22 +813,26 @@
         const toggleBtn = document.getElementById('filter-toggle');
         const dropdown = document.getElementById('filter-dropdown');
         const overlay = document.getElementById('filter-overlay');
-        if (!toggleBtn || !dropdown || !overlay) return;
+        if (toggleBtn && dropdown && overlay) {
+            function closeFilters() {
+                dropdown.classList.remove('open');
+                overlay.classList.remove('open');
+            }
 
-        function closeFilters() {
-            dropdown.classList.remove('open');
-            overlay.classList.remove('open');
+            toggleBtn.addEventListener('click', function () {
+                const shouldOpen = !dropdown.classList.contains('open');
+                dropdown.classList.toggle('open', shouldOpen);
+                overlay.classList.toggle('open', shouldOpen);
+            });
+
+            overlay.addEventListener('click', closeFilters);
+            document.addEventListener('keydown', function (event) {
+                if (event.key === 'Escape') closeFilters();
+            });
         }
 
-        toggleBtn.addEventListener('click', function () {
-            const shouldOpen = !dropdown.classList.contains('open');
-            dropdown.classList.toggle('open', shouldOpen);
-            overlay.classList.toggle('open', shouldOpen);
-        });
-
-        overlay.addEventListener('click', closeFilters);
         document.addEventListener('keydown', function (event) {
-            if (event.key === 'Escape') closeFilters();
+            if (event.key === 'Escape') closeSidebar();
         });
     })();
     </script>

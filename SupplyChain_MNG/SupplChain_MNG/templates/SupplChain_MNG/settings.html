@@ -116,5 +116,21 @@
         <div class="settings-card-desc">Assign users to operational roles — Storekeeper, Fleet Officer, Operations Manager.</div>
     </a>
 
+    {% if request.user.is_staff %}
+    <a class="settings-card" href="/admin/">
+        <div class="settings-card-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="4" width="18" height="14" rx="2"/>
+                <path d="M8 20h8"/>
+                <path d="M12 18v2"/>
+                <path d="M7 9h10"/>
+                <path d="M7 13h6"/>
+            </svg>
+        </div>
+        <div class="settings-card-title">Django Admin</div>
+        <div class="settings-card-desc">Open the built-in Django administration panel for advanced management.</div>
+    </a>
+    {% endif %}
+
 </div>
 {% endblock %}
