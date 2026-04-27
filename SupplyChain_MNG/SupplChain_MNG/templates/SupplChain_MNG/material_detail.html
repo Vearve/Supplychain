@@ -9,6 +9,7 @@
         <h2 style="margin-top: 0;">{{ material.name }}</h2>
         <p><strong>Code Number:</strong> {{ material.code_number }}</p>
         <p><strong>Part Number:</strong> {{ material.part_number|default:'-' }}</p>
+        <p><strong>Serial Number:</strong> {{ material.serial_number|default:'-' }}</p>
         <p><strong>Category:</strong> {{ material.category.name|default:'-' }}</p>
         <p><strong>Subcategory:</strong> {{ material.subcategory.name|default:'-' }}</p>
         <p><strong>Equipment:</strong> {{ material.equipment.name|default:'-' }}</p>

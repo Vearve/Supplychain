@@ -18,6 +18,7 @@
                 <th>Name</th>
                 <th>Code Number</th>
                 <th>Part Number</th>
+                <th>Serial Number</th>
                 <th>Consumable</th>
                 <th>Measure</th>
                 <th>Category</th>
@@ -36,6 +37,7 @@
                 <td><a href="{% url 'material_detail' item.id %}">{{ item.name }}</a></td>
                 <td>{{ item.code_number }}</td>
                 <td>{{ item.part_number|default:'-' }}</td>
+                <td>{{ item.serial_number|default:'-' }}</td>
                 <td>{% if item.is_consumable %}Yes{% else %}No{% endif %}</td>
                 <td>{{ item.get_measurement_unit_display }}</td>
                 <td>{{ item.category.name|default:'-' }}</td>
@@ -71,7 +73,7 @@
                 </td>
             </tr>
             {% empty %}
-            <tr><td colspan="13">No materials found for selected filters.</td></tr>
+            <tr><td colspan="14">No materials found for selected filters.</td></tr>
             {% endfor %}
         </tbody>
     </table>

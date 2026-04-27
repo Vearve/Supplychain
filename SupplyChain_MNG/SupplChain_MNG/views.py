@@ -351,6 +351,7 @@ EXPORT_FIELDS = {
         ("name", "Name"),
         ("code_number", "Code Number"),
         ("part_number", "Part Number"),
+        ("serial_number", "Serial Number"),
         ("is_consumable", "Consumable"),
         ("measurement_unit", "Measurement"),
         ("category__name", "Category"),

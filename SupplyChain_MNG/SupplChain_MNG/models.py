@@ -67,6 +67,7 @@ class Material(models.Model):
     name = models.CharField(max_length=100)
     code_number = models.CharField(max_length=50, unique=True, default='UNKNOWN')  # Add unique=True
     part_number = models.CharField(max_length=50, unique=True, null=True, blank=True)  # Optional
+    serial_number = models.CharField(max_length=80, blank=True)
     is_consumable = models.BooleanField(default=False)
     measurement_unit = models.CharField(max_length=8, choices=MEASUREMENT_UNITS, default='UNIT')
     photo = models.FileField(upload_to='materials/photos/', null=True, blank=True)

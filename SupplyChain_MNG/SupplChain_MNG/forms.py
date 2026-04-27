@@ -88,6 +88,7 @@ class MaterialForm(forms.ModelForm):
             "name",
             "code_number",
             "part_number",
+            "serial_number",
             "is_consumable",
             "measurement_unit",
             "photo",
