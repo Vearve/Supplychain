@@ -1,0 +1,217 @@
+{% extends 'SupplChain_MNG/workspace_base.html' %}
+
+{% block title %}Manage Warehouse{% endblock %}
+{% block page_title %}Warehouse: {{ warehouse.name }}{% endblock %}
+
+{% block content %}
+<style>
+    .project-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 12px;
+    }
+
+    .project-card-link {
+        text-decoration: none;
+        color: inherit;
+        display: block;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: var(--card);
+        padding: 14px;
+        transition: transform 0.12s ease, border-color 0.12s ease;
+    }
+
+    .project-card-link:hover {
+        transform: translateY(-1px);
+        border-color: var(--brand);
+    }
+
+    .project-title {
+        margin: 0 0 6px;
+        font-size: 1.04rem;
+    }
+
+    .project-stats {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        margin-top: 10px;
+    }
+
+    .project-stat {
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 8px;
+        font-size: 0.84rem;
+    }
+
+    .form-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 12px;
+    }
+
+    .form-block {
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 12px;
+        background: var(--card);
+    }
+
+    .form-block h4 {
+        margin: 0 0 10px;
+    }
+
+    .form-block p {
+        margin: 0 0 10px;
+        color: var(--muted);
+        font-size: 0.88rem;
+    }
+
+    .field {
+        margin-bottom: 8px;
+    }
+
+    .field label {
+        display: block;
+        margin-bottom: 4px;
+        font-size: 0.85rem;
+        color: var(--muted);
+    }
+</style>
+
+<section class="cards" style="margin-bottom: 12px;">
+    <article class="metric"><div class="label">Stores</div><div class="value">{{ store_count }}</div></article>
+    <article class="metric"><div class="label">Bins (Zone/Aisle/Rack/Shelf/Bin)</div><div class="value">{{ bin_count }}</div></article>
+    <article class="metric"><div class="label">Stock Lines</div><div class="value">{{ stock_line_count }}</div></article>
+    <article class="metric"><div class="label">Stock Quantity</div><div class="value">{{ warehouse_stock_qty }}</div></article>
+    <article class="metric"><div class="label">Linked Projects</div><div class="value">{{ linked_project_count }}</div></article>
+    <article class="metric"><div class="label">Pending Requisitions</div><div class="value">{{ warehouse_pending_requisitions }}</div></article>
+    <article class="metric"><div class="label">Returned Goods Qty</div><div class="value">{{ warehouse_returned_goods_qty }}</div></article>
+</section>
+
+<div class="panel panel-pad" style="margin-bottom: 12px; display: flex; gap: 8px; flex-wrap: wrap;">
+    <a class="btn btn-neutral" href="{% url 'warehouse_management' %}">← Back to Warehouses</a>
+    <a class="btn btn-primary" href="{% url 'goods_received_create' %}">Stock In</a>
+    <a class="btn btn-primary" href="{% url 'warehouse_transfer_preset' %}">Warehouse → Site Transfer</a>
+    <a class="btn btn-neutral" href="{% url 'inventory_management' %}">Inventory Setup</a>
+</div>
+
+<section class="panel panel-pad" style="margin-bottom: 12px;">
+    <h3 style="margin-top: 0;">Manage Warehouse Setup In One Place</h3>
+    <div class="form-grid">
+        <form class="form-block" method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="create_store">
+            <h4>Create Store In This Warehouse</h4>
+            <p>Create HQ/Site store directly here and attach it to {{ warehouse.name }}.</p>
+            {% for field in store_form %}
+            <div class="field">
+                <label>{{ field.label }}</label>
+                {{ field }}
+                {% for err in field.errors %}<div style="color:var(--bad); font-size:0.82rem;">{{ err }}</div>{% endfor %}
+            </div>
+            {% endfor %}
+            <button type="submit" class="btn btn-primary">Save Store</button>
+        </form>
+
+        <form class="form-block" method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="create_bin">
+            <h4>Create Bin Hierarchy</h4>
+            <p>Define all 5 levels: Zone, Aisle, Rack, Shelf, and Bin.</p>
+            {% for field in bin_form %}
+            <div class="field">
+                <label>{{ field.label }}</label>
+                {{ field }}
+                {% for err in field.errors %}<div style="color:var(--bad); font-size:0.82rem;">{{ err }}</div>{% endfor %}
+            </div>
+            {% endfor %}
+            <button type="submit" class="btn btn-primary">Save Bin</button>
+        </form>
+
+        <form class="form-block" method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="link_project">
+            <h4>Link Project / Site</h4>
+            <p>Select from existing projects and map a site store to this warehouse.</p>
+            {% for field in link_form %}
+            <div class="field">
+                <label>{{ field.label }}</label>
+                {{ field }}
+                {% for err in field.errors %}<div style="color:var(--bad); font-size:0.82rem;">{{ err }}</div>{% endfor %}
+            </div>
+            {% endfor %}
+            <button type="submit" class="btn btn-primary">Link Project</button>
+        </form>
+    </div>
+</section>
+
+<section class="panel panel-pad table-wrap" style="margin-bottom: 12px;">
+    <h3 style="margin-top: 0;">Store Locations In {{ warehouse.name }}</h3>
+    <table>
+        <thead><tr><th>Store</th><th>Type</th><th>Project</th><th>Status</th><th>Actions</th></tr></thead>
+        <tbody>
+            {% for item in store_rows %}
+            <tr>
+                <td>{{ item.name }}</td>
+                <td>{{ item.get_location_type_display }}</td>
+                <td>{{ item.project.name|default:'-' }}</td>
+                <td>{% if item.is_active %}<span class="badge badge-ok">Active</span>{% else %}<span class="badge badge-neutral">Inactive</span>{% endif %}</td>
+                <td>
+                    <a class="btn btn-neutral btn-sm" href="{% url 'record_update' 'store-locations' item.id %}">Edit</a>
+                    <a class="btn btn-primary btn-sm" href="{% url 'goods_received_create' %}?store={{ item.id }}">Stock In</a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5">No stores linked to this warehouse yet.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+
+<section class="panel panel-pad table-wrap" style="margin-bottom: 12px;">
+    <h3 style="margin-top: 0;">Warehouse Bin Hierarchy</h3>
+    <table>
+        <thead><tr><th>Store</th><th>Zone</th><th>Aisle</th><th>Rack</th><th>Shelf</th><th>Bin</th><th>Status</th></tr></thead>
+        <tbody>
+            {% for item in bin_rows %}
+            <tr>
+                <td>{{ item.store_location.name }}</td>
+                <td>{{ item.zone|default:'-' }}</td>
+                <td>{{ item.aisle|default:'-' }}</td>
+                <td>{{ item.rack|default:'-' }}</td>
+                <td>{{ item.shelf|default:'-' }}</td>
+                <td>{{ item.bin_code }}</td>
+                <td>{% if item.is_active %}<span class="badge badge-ok">Active</span>{% else %}<span class="badge badge-neutral">Inactive</span>{% endif %}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="7">No bins available for this warehouse.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+
+<section class="panel panel-pad" style="margin-bottom: 12px;">
+    <h3 style="margin-top: 0;">Projects / Sites Served By This Warehouse</h3>
+    <div class="project-grid">
+        {% for card in project_cards %}
+        <a class="project-card-link" href="{% url 'project_manage' card.project.id %}">
+            <h4 class="project-title">{{ card.project.name }}</h4>
+            <div style="color:var(--muted); font-size:0.88rem;">Click to open project/site page</div>
+
+            <div class="project-stats">
+                <div class="project-stat"><strong>Sent Qty</strong><div>{{ card.sent_qty }}</div></div>
+                <div class="project-stat"><strong>Received Qty</strong><div>{{ card.received_qty }}</div></div>
+                <div class="project-stat"><strong>In Store Qty</strong><div>{{ card.in_store_qty }}</div></div>
+                <div class="project-stat"><strong>Pending Req.</strong><div>{{ card.pending_requisitions }}</div></div>
+                <div class="project-stat"><strong>Returned Qty</strong><div>{{ card.returned_goods_qty }}</div></div>
+            </div>
+        </a>
+        {% empty %}
+        <div class="panel panel-pad">No linked projects/sites yet.</div>
+        {% endfor %}
+    </div>
+</section>
+{% endblock %}

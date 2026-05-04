@@ -628,6 +628,7 @@
                 <a class="tab-link {% if active_tab == 'home' %}active{% endif %}" href="{% url 'workspace_home' %}">Home</a>
                 <a class="tab-link {% if active_tab == 'overview' %}active{% endif %}" href="{% url 'ops_overview' %}">Ops Overview</a>
                 <a class="tab-link {% if active_tab == 'projects' or active_tab == 'project_manage' %}active{% endif %}" href="{% url 'projects' %}">Projects / Sites</a>
+                <a class="tab-link {% if active_tab == 'warehouse' %}active{% endif %}" href="{% url 'warehouse_management' %}">Warehouse Management</a>
                 <a class="tab-link {% if active_tab == 'requisitions' %}active{% endif %}" href="{% url 'requisitions' %}">
                     <span>Requisitions</span>
                     {% if unread_requisitions_count > 0 %}

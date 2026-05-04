@@ -37,6 +37,7 @@ from .forms import (
     PPEIssueForm,
     PPEIssueItemFormSet,
     WarehouseTransferPresetForm,
+    WarehouseProjectLinkForm,
     UserStoreScopeForm,
     ProjectRequisitionForm,
     WorkspaceRequisitionForm,
@@ -250,6 +251,7 @@ SECTION_MANAGERS = {
     "ppe": {"Storekeeper"},
     "overview": {"Storekeeper", "Fleet Officer"},
     "inventory": {"Storekeeper"},
+    "warehouse": {"Storekeeper"},
     "scope": {"Operations Manager"},
     "roles": {"Operations Manager"},
     "audit": {"Operations Manager"},
@@ -599,8 +601,8 @@ CRUD_REGISTRY = {
     "warehouses": {
         "model": Warehouse,
         "form": WarehouseForm,
-        "route": "inventory_management",
-        "active_tab": "inventory",
+        "route": "warehouse_management",
+        "active_tab": "warehouse",
         "label": "Warehouse",
     },
     "store-locations": {
@@ -1201,6 +1203,187 @@ def projects_view(request):
 
 
 @login_required
+def warehouse_management_view(request):
+    context = _base_context(request, "warehouse")
+    warehouses = Warehouse.objects.order_by("name")
+    scoped_ids = _scoped_store_ids(request.user)
+    if scoped_ids is not None:
+        warehouses = warehouses.filter(store_locations__id__in=scoped_ids).distinct()
+
+    store_rows = _filter_by_store_scope(
+        StoreLocation.objects.select_related("project", "warehouse").order_by("name"),
+        request.user,
+        "id",
+    )
+    bin_rows = _filter_by_store_scope(
+        StorageBin.objects.select_related("store_location", "store_location__warehouse").order_by("store_location__name", "bin_code"),
+        request.user,
+        "store_location_id",
+    )
+    balance_rows = _filter_by_store_scope(
+        InventoryBalance.objects.select_related("storage_bin", "storage_bin__store_location", "material").order_by("material__name"),
+        request.user,
+        "storage_bin__store_location_id",
+    )
+
+    cards = []
+    for wh in warehouses:
+        wh_store_ids = list(store_rows.filter(warehouse=wh).values_list("id", flat=True))
+        wh_project_ids = list(
+            store_rows.filter(warehouse=wh, project__isnull=False).values_list("project_id", flat=True).distinct()
+        )
+        wh_requisitions = Requisition.objects.filter(project_id__in=wh_project_ids)
+        wh_returns = MaterialReturn.objects.filter(project_id__in=wh_project_ids)
+
+        cards.append(
+            {
+                "warehouse": wh,
+                "store_count": len(wh_store_ids),
+                "project_count": len(wh_project_ids),
+                "bin_count": bin_rows.filter(store_location_id__in=wh_store_ids).count(),
+                "stock_qty": balance_rows.filter(storage_bin__store_location_id__in=wh_store_ids).aggregate(total=Sum("on_hand"))["total"] or 0,
+                "pending_requisitions": wh_requisitions.filter(fulfilled=False).count(),
+                "returns_qty": wh_returns.aggregate(total=Sum("quantity_returned"))["total"] or 0,
+            }
+        )
+
+    context.update(
+        {
+            "warehouse_cards": cards,
+            "warehouse_count": warehouses.count(),
+            "active_warehouse_count": warehouses.filter(is_active=True).count(),
+            "warehouse_store_count": store_rows.filter(warehouse__isnull=False).count(),
+            "warehouse_project_count": store_rows.filter(warehouse__isnull=False, project__isnull=False).values("project_id").distinct().count(),
+            "warehouse_stock_lines": balance_rows.filter(storage_bin__store_location__warehouse__isnull=False, on_hand__gt=0).count(),
+        }
+    )
+    return render(request, "SupplChain_MNG/warehouse_management.html", context)
+
+
+@login_required
+def warehouse_manage_view(request, pk):
+    context = _base_context(request, "warehouse")
+    warehouse = get_object_or_404(Warehouse, pk=pk)
+    _enforce_manage_access(request.user, "warehouse")
+
+    scoped_ids = _scoped_store_ids(request.user)
+    stores_qs = StoreLocation.objects.select_related("project", "warehouse").filter(warehouse=warehouse).order_by("name")
+    if scoped_ids is not None:
+        stores_qs = stores_qs.filter(id__in=scoped_ids)
+
+    bins_qs = StorageBin.objects.select_related("store_location").filter(store_location__warehouse=warehouse).order_by(
+        "store_location__name", "zone", "aisle", "rack", "shelf", "bin_code"
+    )
+    balances_qs = InventoryBalance.objects.select_related("material", "storage_bin", "storage_bin__store_location").filter(
+        storage_bin__store_location__warehouse=warehouse
+    )
+
+    if scoped_ids is not None:
+        bins_qs = bins_qs.filter(store_location_id__in=scoped_ids)
+        balances_qs = balances_qs.filter(storage_bin__store_location_id__in=scoped_ids)
+
+    linked_projects = list(
+        Project.objects.filter(store_locations__warehouse=warehouse).distinct().order_by("name")
+    )
+
+    project_cards = []
+    for project in linked_projects:
+        project_store_ids = list(
+            stores_qs.filter(project=project).values_list("id", flat=True)
+        )
+        if not project_store_ids:
+            continue
+
+        sent_qty = InventoryMovement.objects.filter(from_store_id__in=project_store_ids).aggregate(total=Sum("quantity"))["total"] or 0
+        received_qty = InventoryMovement.objects.filter(to_store_id__in=project_store_ids).aggregate(total=Sum("quantity"))["total"] or 0
+        in_store_qty = balances_qs.filter(storage_bin__store_location_id__in=project_store_ids).aggregate(total=Sum("on_hand"))["total"] or 0
+        pending_requisitions = Requisition.objects.filter(project=project, fulfilled=False).count()
+        returned_goods_qty = MaterialReturn.objects.filter(project=project).aggregate(total=Sum("quantity_returned"))["total"] or 0
+
+        project_cards.append(
+            {
+                "project": project,
+                "sent_qty": sent_qty,
+                "received_qty": received_qty,
+                "in_store_qty": in_store_qty,
+                "pending_requisitions": pending_requisitions,
+                "returned_goods_qty": returned_goods_qty,
+            }
+        )
+
+    store_form = StoreLocationForm(prefix="store")
+    store_form.fields["warehouse"].queryset = Warehouse.objects.filter(pk=warehouse.pk)
+    store_form.fields["warehouse"].initial = warehouse.pk
+
+    bin_form = StorageBinForm(prefix="bin")
+    bin_form.fields["store_location"].queryset = stores_qs
+
+    link_form = WarehouseProjectLinkForm(prefix="link")
+    if scoped_ids is not None:
+        link_form.fields["site_store"].queryset = link_form.fields["site_store"].queryset.filter(id__in=scoped_ids)
+
+    if request.method == "POST":
+        action = request.POST.get("action")
+
+        if action == "create_store":
+            store_form = StoreLocationForm(request.POST, prefix="store")
+            store_form.fields["warehouse"].queryset = Warehouse.objects.filter(pk=warehouse.pk)
+            if store_form.is_valid():
+                store = store_form.save(commit=False)
+                store.warehouse = warehouse
+                store.save()
+                messages.success(request, "Store linked to warehouse successfully.")
+                return redirect("warehouse_manage", pk=warehouse.pk)
+
+        elif action == "create_bin":
+            bin_form = StorageBinForm(request.POST, prefix="bin")
+            bin_form.fields["store_location"].queryset = stores_qs
+            if bin_form.is_valid():
+                storage_bin = bin_form.save(commit=False)
+                if storage_bin.store_location.warehouse_id != warehouse.id:
+                    bin_form.add_error("store_location", "Selected store does not belong to this warehouse.")
+                else:
+                    storage_bin.save()
+                    messages.success(request, "Bin created successfully.")
+                    return redirect("warehouse_manage", pk=warehouse.pk)
+
+        elif action == "link_project":
+            link_form = WarehouseProjectLinkForm(request.POST, prefix="link")
+            if scoped_ids is not None:
+                link_form.fields["site_store"].queryset = link_form.fields["site_store"].queryset.filter(id__in=scoped_ids)
+
+            if link_form.is_valid():
+                site_store = link_form.cleaned_data["site_store"]
+                project = link_form.cleaned_data["project"]
+                site_store.project = project
+                site_store.warehouse = warehouse
+                site_store.save(update_fields=["project", "warehouse"])
+                messages.success(request, "Project/site linked to this warehouse successfully.")
+                return redirect("warehouse_manage", pk=warehouse.pk)
+
+    context.update(
+        {
+            "warehouse": warehouse,
+            "store_rows": list(stores_qs),
+            "bin_rows": list(bins_qs[:300]),
+            "balance_rows": list(balances_qs.filter(on_hand__gt=0)[:300]),
+            "project_cards": project_cards,
+            "store_form": store_form,
+            "bin_form": bin_form,
+            "link_form": link_form,
+            "linked_project_count": len(project_cards),
+            "store_count": stores_qs.count(),
+            "bin_count": bins_qs.count(),
+            "stock_line_count": balances_qs.filter(on_hand__gt=0).count(),
+            "warehouse_stock_qty": balances_qs.aggregate(total=Sum("on_hand"))["total"] or 0,
+            "warehouse_pending_requisitions": sum([item["pending_requisitions"] for item in project_cards]),
+            "warehouse_returned_goods_qty": sum([item["returned_goods_qty"] for item in project_cards]),
+        }
+    )
+    return render(request, "SupplChain_MNG/warehouse_manage.html", context)
+
+
+@login_required
 def material_returns_view(request):
     context = _base_context(request, "returns")
     context["rows"] = context["returns"].order_by("-date_returned")
@@ -1299,6 +1482,10 @@ def goods_received_create_view(request):
     formset = GoodsReceiptItemFormSet(request.POST or None, instance=receipt, prefix="items")
 
     project, project_stores_qs, project_store_ids = _project_store_context(request)
+    selected_store_param = (request.GET.get("store") or "").strip()
+    selected_store_qs = StoreLocation.objects.filter(pk=selected_store_param) if selected_store_param else StoreLocation.objects.none()
+    selected_store_qs = _filter_by_store_scope(selected_store_qs, request.user, "id")
+    selected_store = selected_store_qs.first() if selected_store_param else None
     if project:
         form.fields["destination_store"].queryset = project_stores_qs
         form.fields["destination_bin"].queryset = StorageBin.objects.filter(
@@ -1311,6 +1498,14 @@ def goods_received_create_view(request):
                 store_location_id=project_store_ids[0],
                 is_active=True,
             ).order_by("bin_code")
+
+    if selected_store:
+        form.fields["destination_store"].queryset = StoreLocation.objects.filter(pk=selected_store.pk)
+        form.fields["destination_store"].initial = selected_store.pk
+        form.fields["destination_bin"].queryset = StorageBin.objects.filter(
+            store_location=selected_store,
+            is_active=True,
+        ).order_by("bin_code")
 
     selected_store_id = (request.POST.get("destination_store") if request.method == "POST" else form.initial.get("destination_store"))
     if selected_store_id:
@@ -2473,6 +2668,73 @@ def fleet_management_view(request):
     if context["filters"]["code_number"]:
         movement_rows = movement_rows.filter(material__code_number__icontains=context["filters"]["code_number"])
 
+    fuel_usage_total = fuel_rows.aggregate(total=Sum("quantity"))["total"] or 0
+    inactive_fleets_count = len([row for row in equipment_rows if not row.is_active])
+    maintenance_due_count = len([row for row in equipment_rows if row.service_due_date and row.service_due_date <= soon])
+
+    def _fleet_due_rows(date_attr):
+        rows = []
+        for eq in equipment_rows:
+            due_date = getattr(eq, date_attr)
+            if not due_date:
+                continue
+            rows.append(
+                {
+                    "name": eq.name,
+                    "location": eq.store_location.name if eq.store_location else "-",
+                    "due_date": due_date.strftime("%Y-%m-%d"),
+                    "status": _due_meta(due_date)["label"],
+                }
+            )
+        return rows
+
+    fleet_dialog_data = {
+        "total_vehicles": [
+            {
+                "name": eq.name,
+                "location": eq.store_location.name if eq.store_location else "-",
+                "due_date": "-",
+                "status": "Active" if eq.is_active else "Inactive",
+            }
+            for eq in equipment_rows
+        ],
+        "active_vehicles": [
+            {
+                "name": eq.name,
+                "location": eq.store_location.name if eq.store_location else "-",
+                "due_date": "-",
+                "status": "Active",
+            }
+            for eq in equipment_rows
+            if eq.is_active
+        ],
+        "inactive_vehicles": [
+            {
+                "name": eq.name,
+                "location": eq.store_location.name if eq.store_location else "-",
+                "due_date": "-",
+                "status": "Inactive",
+            }
+            for eq in equipment_rows
+            if not eq.is_active
+        ],
+        "maintenance_due": _fleet_due_rows("service_due_date"),
+        "road_tax_due": _fleet_due_rows("road_tax_due_date"),
+        "fitness_due": _fleet_due_rows("fitness_due_date"),
+        "insurance_due": _fleet_due_rows("insurance_due_date"),
+        "fuel_usage": [
+            {
+                "name": row["equipment__name"] or "-",
+                "location": row["equipment__store_location__name"] or "-",
+                "due_date": row["last_logged"].strftime("%Y-%m-%d") if row["last_logged"] else "-",
+                "status": "Tracked",
+            }
+            for row in fuel_rows.values("equipment__name", "equipment__store_location__name")
+            .annotate(total=Sum("quantity"), last_logged=Max("date_logged"))
+            .order_by("-total")
+        ],
+    }
+
     context.update(
         {
             "equipment_rows": equipment_rows,
@@ -2489,6 +2751,11 @@ def fleet_management_view(request):
             "due_fitness_count": len([row for row in equipment_rows if row.fitness_due_date and row.fitness_due_date <= soon]),
             "due_insurance_count": len([row for row in equipment_rows if row.insurance_due_date and row.insurance_due_date <= soon]),
             "due_license_count": len([row for row in driver_rows if row.license_expiry and row.license_expiry <= soon]),
+            "total_vehicles_count": len(equipment_rows),
+            "inactive_fleets_count": inactive_fleets_count,
+            "maintenance_due_count": maintenance_due_count,
+            "fuel_usage_total": fuel_usage_total,
+            "fleet_dialog_data_json": json.dumps(fleet_dialog_data),
         }
     )
     return render(request, "SupplChain_MNG/fleet_management.html", context)

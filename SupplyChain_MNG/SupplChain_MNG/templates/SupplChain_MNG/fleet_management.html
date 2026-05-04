@@ -4,15 +4,55 @@
 {% block page_title %}Fleet Management{% endblock %}
 
 {% block content %}
+<style>
+    .kpi-click {
+        cursor: pointer;
+        transition: transform 0.12s ease, box-shadow 0.12s ease;
+    }
+
+    .kpi-click:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 3px 14px #00000012;
+    }
+
+    .dialog-overlay {
+        position: fixed;
+        inset: 0;
+        background: #00000057;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 60;
+        padding: 16px;
+    }
+
+    .dialog-box {
+        width: min(920px, 96vw);
+        max-height: 82vh;
+        overflow: auto;
+        background: var(--card);
+        border-radius: 14px;
+        border: 1px solid var(--line);
+        padding: 14px;
+    }
+
+    .dialog-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+    }
+</style>
+
 <section class="cards" style="margin-bottom: 12px;">
-    <article class="metric"><div class="label">Active Fleets</div><div class="value">{{ active_fleets_count }}</div></article>
-    <article class="metric"><div class="label">In Maintenance</div><div class="value">{{ in_maintenance_count }}</div></article>
-    <article class="metric"><div class="label">Broken</div><div class="value">{{ broken_count }}</div></article>
-    <article class="metric"><div class="label">Service Due Soon</div><div class="value">{{ due_service_count }}</div></article>
-    <article class="metric"><div class="label">Road Tax Due Soon</div><div class="value">{{ due_road_tax_count }}</div></article>
-    <article class="metric"><div class="label">Fitness Due Soon</div><div class="value">{{ due_fitness_count }}</div></article>
-    <article class="metric"><div class="label">Insurance Due Soon</div><div class="value">{{ due_insurance_count }}</div></article>
-    <article class="metric"><div class="label">Driver Licenses Due Soon</div><div class="value">{{ due_license_count }}</div></article>
+    <article class="metric kpi-click" data-dialog-key="total_vehicles"><div class="label">Total Vehicles</div><div class="value">{{ total_vehicles_count }}</div></article>
+    <article class="metric kpi-click" data-dialog-key="active_vehicles"><div class="label">Active Vehicles</div><div class="value">{{ active_fleets_count }}</div></article>
+    <article class="metric kpi-click" data-dialog-key="inactive_vehicles"><div class="label">Inactive Vehicles</div><div class="value">{{ inactive_fleets_count }}</div></article>
+    <article class="metric kpi-click" data-dialog-key="maintenance_due"><div class="label">Maintenance Due</div><div class="value">{{ maintenance_due_count }}</div></article>
+    <article class="metric kpi-click" data-dialog-key="fuel_usage"><div class="label">Fuel Usage</div><div class="value">{{ fuel_usage_total }}</div></article>
+    <article class="metric kpi-click" data-dialog-key="road_tax_due"><div class="label">Road Tax</div><div class="value">{{ due_road_tax_count }}</div></article>
+    <article class="metric kpi-click" data-dialog-key="fitness_due"><div class="label">Fitness</div><div class="value">{{ due_fitness_count }}</div></article>
+    <article class="metric kpi-click" data-dialog-key="insurance_due"><div class="label">Insurance</div><div class="value">{{ due_insurance_count }}</div></article>
 </section>
 
 <div class="panel panel-pad" style="margin-bottom: 12px; display: flex; gap: 8px; flex-wrap: wrap;">
@@ -196,4 +236,80 @@
         </tbody>
     </table>
 </section>
+
+<div class="dialog-overlay" id="fleet-dialog-overlay">
+    <div class="dialog-box">
+        <div class="dialog-head">
+            <h3 id="fleet-dialog-title" style="margin: 0;">Fleet KPI Details</h3>
+            <button type="button" class="btn btn-neutral" id="fleet-dialog-close">Close</button>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>Name</th><th>Location</th><th>Due / Last Date</th><th>Status</th></tr></thead>
+                <tbody id="fleet-dialog-body"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+    const fleetData = JSON.parse('{{ fleet_dialog_data_json|escapejs }}');
+    const overlay = document.getElementById('fleet-dialog-overlay');
+    const body = document.getElementById('fleet-dialog-body');
+    const title = document.getElementById('fleet-dialog-title');
+    const closeBtn = document.getElementById('fleet-dialog-close');
+    const cards = document.querySelectorAll('.kpi-click[data-dialog-key]');
+
+    const labels = {
+        total_vehicles: 'Total Vehicles',
+        active_vehicles: 'Active Vehicles',
+        inactive_vehicles: 'Inactive Vehicles',
+        maintenance_due: 'Maintenance Due',
+        fuel_usage: 'Fuel Usage',
+        road_tax_due: 'Road Tax Due',
+        fitness_due: 'Fitness Due',
+        insurance_due: 'Insurance Due'
+    };
+
+    function openDialog(key) {
+        const rows = fleetData[key] || [];
+        title.textContent = labels[key] || 'Fleet KPI Details';
+        body.innerHTML = '';
+
+        if (!rows.length) {
+            body.innerHTML = '<tr><td colspan="4">No records available.</td></tr>';
+        } else {
+            rows.forEach(function (row) {
+                const tr = document.createElement('tr');
+                tr.innerHTML = '<td>' + (row.name || '-') + '</td>'
+                    + '<td>' + (row.location || '-') + '</td>'
+                    + '<td>' + (row.due_date || '-') + '</td>'
+                    + '<td>' + (row.status || '-') + '</td>';
+                body.appendChild(tr);
+            });
+        }
+        overlay.style.display = 'flex';
+    }
+
+    function closeDialog() {
+        overlay.style.display = 'none';
+    }
+
+    cards.forEach(function (card) {
+        card.addEventListener('click', function () {
+            openDialog(card.getAttribute('data-dialog-key'));
+        });
+    });
+
+    closeBtn.addEventListener('click', closeDialog);
+    overlay.addEventListener('click', function (evt) {
+        if (evt.target === overlay) {
+            closeDialog();
+        }
+    });
+})();
+</script>
 {% endblock %}

@@ -340,6 +340,13 @@ class WarehouseTransferPresetForm(forms.Form):
         ).order_by("warehouse__name", "name")
 
 
+class WarehouseProjectLinkForm(forms.Form):
+    project = forms.ModelChoiceField(queryset=Project.objects.order_by("name"))
+    site_store = forms.ModelChoiceField(
+        queryset=StoreLocation.objects.filter(location_type="SITE", is_active=True).select_related("project").order_by("name")
+    )
+
+
 class GoodsReceiptItemForm(forms.ModelForm):
     class Meta:
         model = GoodsReceiptItem
