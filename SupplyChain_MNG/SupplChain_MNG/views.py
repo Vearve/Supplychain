@@ -1282,6 +1282,16 @@ def warehouse_manage_view(request, pk):
         bins_qs = bins_qs.filter(store_location_id__in=scoped_ids)
         balances_qs = balances_qs.filter(storage_bin__store_location_id__in=scoped_ids)
 
+    wh_store_ids = list(stores_qs.values_list("id", flat=True))
+
+    recent_movements = list(
+        InventoryMovement.objects.select_related(
+            "material", "from_store", "to_store", "from_bin", "to_bin", "created_by"
+        )
+        .filter(Q(from_store_id__in=wh_store_ids) | Q(to_store_id__in=wh_store_ids))
+        .order_by("-created_at")[:50]
+    )
+
     linked_projects = list(
         Project.objects.filter(store_locations__warehouse=warehouse).distinct().order_by("name")
     )
@@ -1366,7 +1376,18 @@ def warehouse_manage_view(request, pk):
             "warehouse": warehouse,
             "store_rows": list(stores_qs),
             "bin_rows": list(bins_qs[:300]),
-            "balance_rows": list(balances_qs.filter(on_hand__gt=0)[:300]),
+            "balance_rows": [
+                {
+                    "material": b.material,
+                    "storage_bin": b.storage_bin,
+                    "on_hand": b.on_hand,
+                    "reserved": b.reserved,
+                    "available": b.on_hand - b.reserved,
+                }
+                for b in balances_qs.filter(on_hand__gt=0).select_related(
+                    "material", "storage_bin", "storage_bin__store_location"
+                )[:300]
+            ],
             "project_cards": project_cards,
             "store_form": store_form,
             "bin_form": bin_form,
@@ -1378,6 +1399,7 @@ def warehouse_manage_view(request, pk):
             "warehouse_stock_qty": balances_qs.aggregate(total=Sum("on_hand"))["total"] or 0,
             "warehouse_pending_requisitions": sum([item["pending_requisitions"] for item in project_cards]),
             "warehouse_returned_goods_qty": sum([item["returned_goods_qty"] for item in project_cards]),
+            "recent_movements": recent_movements,
         }
     )
     return render(request, "SupplChain_MNG/warehouse_manage.html", context)

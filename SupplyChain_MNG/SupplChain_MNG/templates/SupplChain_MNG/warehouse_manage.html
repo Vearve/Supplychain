@@ -193,6 +193,114 @@
     </table>
 </section>
 
+<section class="panel panel-pad table-wrap" style="margin-bottom: 12px;">
+    <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:10px;">
+        <h3 style="margin: 0;">Current Stock Balance</h3>
+        <input type="search" id="balanceSearch" placeholder="Filter material, store, bin…"
+            style="padding:6px 10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--text); font-size:0.88rem; width:220px;"
+            oninput="filterBalanceTable(this.value)">
+    </div>
+    <table id="balanceTable">
+        <thead>
+            <tr>
+                <th>Material</th>
+                <th>Code</th>
+                <th>Store</th>
+                <th>Bin</th>
+                <th>On Hand</th>
+                <th>Reserved</th>
+                <th>Available</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in balance_rows %}
+            <tr>
+                <td>{{ row.material.name }}</td>
+                <td>{{ row.material.code_number }}</td>
+                <td>{{ row.storage_bin.store_location.name }}</td>
+                <td>{{ row.storage_bin.bin_code }}</td>
+                <td>{{ row.on_hand }}</td>
+                <td>{{ row.reserved }}</td>
+                <td>{{ row.available }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="7" style="color:var(--muted);">No stock recorded in this warehouse yet.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% if balance_rows|length == 300 %}
+    <p style="color:var(--muted); font-size:0.84rem; margin-top:8px;">Showing first 300 lines. Use filter to narrow results.</p>
+    {% endif %}
+</section>
+
+<script>
+function filterBalanceTable(query) {
+    const q = query.toLowerCase();
+    document.querySelectorAll('#balanceTable tbody tr').forEach(function(row) {
+        row.style.display = (!q || row.textContent.toLowerCase().includes(q)) ? '' : 'none';
+    });
+}
+function filterMovTable(query) {
+    const q = query.toLowerCase();
+    document.querySelectorAll('#movTable tbody tr').forEach(function(row) {
+        row.style.display = (!q || row.textContent.toLowerCase().includes(q)) ? '' : 'none';
+    });
+}
+</script>
+
+<section class="panel panel-pad table-wrap" style="margin-bottom: 12px;">
+    <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:10px;">
+        <h3 style="margin: 0;">Recent Stock Movements</h3>
+        <input type="search" id="movSearch" placeholder="Filter material, type, store…"
+            style="padding:6px 10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--text); font-size:0.88rem; width:220px;"
+            oninput="filterMovTable(this.value)">
+    </div>
+    <table id="movTable">
+        <thead>
+            <tr>
+                <th>Date / Time</th>
+                <th>Type</th>
+                <th>Material</th>
+                <th>Qty</th>
+                <th>From Store</th>
+                <th>From Bin</th>
+                <th>To Store</th>
+                <th>To Bin</th>
+                <th>Ref</th>
+                <th>By</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for mov in recent_movements %}
+            <tr>
+                <td style="white-space:nowrap;">{{ mov.created_at|date:"d M Y H:i" }}</td>
+                <td>
+                    {% if mov.movement_type == "RECEIPT" %}<span class="badge badge-ok">Receipt</span>
+                    {% elif mov.movement_type == "ISSUE" %}<span class="badge badge-warn">Issue</span>
+                    {% elif mov.movement_type == "TRANSFER" %}<span class="badge badge-neutral">Transfer</span>
+                    {% elif mov.movement_type == "RETURN" %}<span class="badge" style="background:var(--brand);color:#fff;">Return</span>
+                    {% else %}<span class="badge badge-neutral">{{ mov.movement_type }}</span>
+                    {% endif %}
+                </td>
+                <td>{{ mov.material.name }}</td>
+                <td>{{ mov.quantity }}</td>
+                <td>{{ mov.from_store.name|default:"—" }}</td>
+                <td>{{ mov.from_bin.bin_code|default:"—" }}</td>
+                <td>{{ mov.to_store.name|default:"—" }}</td>
+                <td>{{ mov.to_bin.bin_code|default:"—" }}</td>
+                <td style="font-size:0.82rem;color:var(--muted);">{{ mov.reference_number|default:"" }}</td>
+                <td style="font-size:0.82rem;">{{ mov.created_by.get_full_name|default:mov.created_by.username|default:"—" }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="10" style="color:var(--muted);">No stock movements recorded for this warehouse yet.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% if recent_movements|length == 50 %}
+    <p style="color:var(--muted); font-size:0.84rem; margin-top:8px;">Showing the 50 most recent movements.</p>
+    {% endif %}
+</section>
+
 <section class="panel panel-pad" style="margin-bottom: 12px;">
     <h3 style="margin-top: 0;">Projects / Sites Served By This Warehouse</h3>
     <div class="project-grid">
