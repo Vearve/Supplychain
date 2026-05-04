@@ -10,7 +10,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth.models import Group, User
-from django.db.models import Count, F, Q, Sum
+from django.db.models import Count, F, Max, Q, Sum
 from django.db import transaction
 from django.db.models.functions import TruncMonth
 from django.http import Http404, HttpResponse, JsonResponse
@@ -36,6 +36,7 @@ from .forms import (
     GoodsReturnItemFormSet,
     PPEIssueForm,
     PPEIssueItemFormSet,
+    WarehouseTransferPresetForm,
     UserStoreScopeForm,
     ProjectRequisitionForm,
     WorkspaceRequisitionForm,
@@ -48,6 +49,7 @@ from .forms import (
     MaterialReturnForm,
     MobileEquipmentForm,
     ProjectForm,
+    WarehouseForm,
     RequisitionForm,
     StoreLocationForm,
     StorageBinForm,
@@ -83,6 +85,7 @@ from .models import (
     RequisitionItem,
     RequisitionReadReceipt,
     RequisitionReservation,
+    Warehouse,
     StoreLocation,
     StorageBin,
     StockTransaction,
@@ -379,9 +382,16 @@ EXPORT_FIELDS = {
         ("location", "Location"),
         ("description", "Description"),
     ],
+    "warehouses": [
+        ("name", "Warehouse Name"),
+        ("location", "Location"),
+        ("description", "Description"),
+        ("is_active", "Active"),
+    ],
     "store-locations": [
         ("name", "Store Name"),
         ("location_type", "Type"),
+        ("warehouse__name", "Warehouse"),
         ("project__name", "Project/Site"),
         ("is_active", "Active"),
     ],
@@ -512,6 +522,12 @@ def _get_filtered_export_queryset(entity, request):
         return data["transactions"].order_by("-date")
     if entity == "projects":
         return Project.objects.order_by("name")
+    if entity == "warehouses":
+        scoped_ids = _scoped_store_ids(request.user)
+        qs = Warehouse.objects.order_by("name")
+        if scoped_ids is not None:
+            qs = qs.filter(store_locations__id__in=scoped_ids).distinct()
+        return qs
     if entity == "categories":
         return Category.objects.order_by("name")
     if entity == "subcategories":
@@ -531,7 +547,7 @@ def _get_filtered_export_queryset(entity, request):
             "store_location_id",
         )
     if entity == "store-locations":
-        return StoreLocation.objects.select_related("project").order_by("name")
+        return StoreLocation.objects.select_related("warehouse", "project").order_by("name")
     if entity == "storage-bins":
         return StorageBin.objects.select_related("store_location").order_by("store_location__name", "bin_code")
     if entity == "inventory-balances":
@@ -579,6 +595,13 @@ CRUD_REGISTRY = {
         "route": "projects",
         "active_tab": "projects",
         "label": "Project",
+    },
+    "warehouses": {
+        "model": Warehouse,
+        "form": WarehouseForm,
+        "route": "inventory_management",
+        "active_tab": "inventory",
+        "label": "Warehouse",
     },
     "store-locations": {
         "model": StoreLocation,
@@ -741,9 +764,24 @@ def inventory_management_view(request):
     name_filter = context["filters"]["name"]
     code_filter = context["filters"]["code_number"]
 
-    store_rows = _filter_by_store_scope(StoreLocation.objects.select_related("project").order_by("name"), request.user, "id")
+    warehouse_rows = Warehouse.objects.order_by("name")
+    scoped_ids = _scoped_store_ids(request.user)
+    if scoped_ids is not None:
+        warehouse_rows = warehouse_rows.filter(store_locations__id__in=scoped_ids).distinct()
     if name_filter:
-        store_rows = store_rows.filter(Q(name__icontains=name_filter) | Q(project__name__icontains=name_filter))
+        warehouse_rows = warehouse_rows.filter(Q(name__icontains=name_filter) | Q(location__icontains=name_filter))
+
+    store_rows = _filter_by_store_scope(
+        StoreLocation.objects.select_related("warehouse", "project").order_by("name"),
+        request.user,
+        "id",
+    )
+    if name_filter:
+        store_rows = store_rows.filter(
+            Q(name__icontains=name_filter)
+            | Q(project__name__icontains=name_filter)
+            | Q(warehouse__name__icontains=name_filter)
+        )
 
     bin_rows = _filter_by_store_scope(
         StorageBin.objects.select_related("store_location").order_by("store_location__name", "bin_code"),
@@ -771,12 +809,61 @@ def inventory_management_view(request):
     else:
         scope_rows = scope_rows.filter(user=request.user).order_by("store_location__name")
 
+    warehouse_insights = []
+    stale_cutoff = timezone.now() - timedelta(days=90)
+    for wh in warehouse_rows:
+        wh_store_ids = list(store_rows.filter(warehouse=wh).values_list("id", flat=True))
+        wh_balances = balance_rows.filter(storage_bin__store_location_id__in=wh_store_ids)
+
+        top_materials = list(
+            wh_balances.values("material__name")
+            .annotate(total=Sum("on_hand"))
+            .order_by("-total")[:5]
+        )
+
+        low_stock_count = wh_balances.filter(on_hand__lte=F("material__min_required")).values("material_id").distinct().count()
+
+        last_moves = {
+            row["material_id"]: row["last_move"]
+            for row in InventoryMovement.objects.filter(
+                Q(from_store_id__in=wh_store_ids) | Q(to_store_id__in=wh_store_ids)
+            )
+            .values("material_id")
+            .annotate(last_move=Max("created_at"))
+        }
+
+        dead_stock_count = 0
+        active_materials = wh_balances.filter(on_hand__gt=0).values("material_id").annotate(total=Sum("on_hand"))
+        for line in active_materials:
+            last_move = last_moves.get(line["material_id"])
+            if not last_move or last_move < stale_cutoff:
+                dead_stock_count += 1
+
+        warehouse_insights.append(
+            {
+                "warehouse": wh,
+                "top_materials": top_materials,
+                "low_stock_count": low_stock_count,
+                "dead_stock_count": dead_stock_count,
+                "total_qty": wh_balances.aggregate(total=Sum("on_hand"))["total"] or 0,
+            }
+        )
+
     context.update(
         {
+            "warehouse_rows": warehouse_rows,
+            "warehouse_insights": warehouse_insights,
             "store_rows": store_rows,
             "bin_rows": bin_rows[:120],
             "balance_rows": balance_rows[:200],
             "scope_rows": scope_rows[:80],
+            "active_warehouse_count": warehouse_rows.filter(is_active=True).count(),
+            "warehouse_store_count": store_rows.filter(warehouse__isnull=False).count(),
+            "warehouse_stock_lines": balance_rows.filter(storage_bin__store_location__warehouse__isnull=False, on_hand__gt=0).count(),
+            "warehouse_low_stock_materials": balance_rows.filter(
+                storage_bin__store_location__warehouse__isnull=False,
+                on_hand__lte=F("material__min_required"),
+            ).values("material_id").distinct().count(),
             "active_store_count": store_rows.filter(is_active=True).count(),
             "active_bin_count": bin_rows.filter(is_active=True).count(),
             "stock_line_count": balance_rows.filter(on_hand__gt=0).count(),
@@ -784,6 +871,57 @@ def inventory_management_view(request):
         }
     )
     return render(request, "SupplChain_MNG/inventory_management.html", context)
+
+
+@login_required
+def warehouse_transfer_preset_view(request):
+    _enforce_manage_access(request.user, "inventory")
+    form = WarehouseTransferPresetForm(request.POST or None)
+
+    if request.method == "POST" and form.is_valid():
+        cd = form.cleaned_data
+        source_store = cd["source_store"]
+        source_bin = cd["source_bin"]
+        destination_store = cd["destination_store"]
+        destination_bin = cd["destination_bin"]
+
+        if source_bin.store_location_id != source_store.id:
+            form.add_error("source_bin", "Source BIN must belong to selected source store.")
+        if destination_bin.store_location_id != destination_store.id:
+            form.add_error("destination_bin", "Destination BIN must belong to selected destination store.")
+
+        if not form.errors:
+            _enforce_store_manage_scope(request.user, source_store.id)
+            _enforce_store_manage_scope(request.user, destination_store.id)
+            try:
+                InventoryMovement.objects.create(
+                    movement_type="TRANSFER",
+                    material=cd["material"],
+                    quantity=cd["quantity"],
+                    from_store=source_store,
+                    from_bin=source_bin,
+                    to_store=destination_store,
+                    to_bin=destination_bin,
+                    reference_type="WAREHOUSE_TRANSFER",
+                    reference_number=cd.get("reference_number") or "",
+                    notes=cd.get("notes") or "",
+                    created_by=request.user,
+                )
+            except ValidationError as exc:
+                form.add_error(None, exc)
+            else:
+                messages.success(request, "Warehouse-to-site transfer posted successfully.")
+                return redirect("inventory_management")
+
+    context = _base_context(request, "inventory")
+    context.update(
+        {
+            "form": form,
+            "title": "Warehouse Transfer Preset",
+            "cancel_url": reverse("inventory_management"),
+        }
+    )
+    return render(request, "SupplChain_MNG/warehouse_transfer_preset_form.html", context)
 
 
 @login_required
@@ -1087,13 +1225,9 @@ def goods_received_view(request):
                     if receipt.stock_posted:
                         raise ValidationError("This goods receipt has already been posted to stock.")
 
-                    destination_bin = (
-                        StorageBin.objects.filter(store_location=receipt.destination_store, is_active=True)
-                        .order_by("bin_code")
-                        .first()
-                    )
+                    destination_bin = receipt.destination_bin
                     if destination_bin is None:
-                        destination_bin = StorageBin.objects.create(store_location=receipt.destination_store, bin_code="")
+                        raise ValidationError("Put-away BIN is required before posting goods receipt.")
 
                     items = list(receipt.items.select_related("material"))
                     if not items:
@@ -1167,8 +1301,23 @@ def goods_received_create_view(request):
     project, project_stores_qs, project_store_ids = _project_store_context(request)
     if project:
         form.fields["destination_store"].queryset = project_stores_qs
+        form.fields["destination_bin"].queryset = StorageBin.objects.filter(
+            store_location_id__in=project_store_ids,
+            is_active=True,
+        ).order_by("store_location__name", "bin_code")
         if request.method == "GET" and len(project_store_ids) == 1:
             form.fields["destination_store"].initial = project_store_ids[0]
+            form.fields["destination_bin"].queryset = StorageBin.objects.filter(
+                store_location_id=project_store_ids[0],
+                is_active=True,
+            ).order_by("bin_code")
+
+    selected_store_id = (request.POST.get("destination_store") if request.method == "POST" else form.initial.get("destination_store"))
+    if selected_store_id:
+        form.fields["destination_bin"].queryset = StorageBin.objects.filter(
+            store_location_id=selected_store_id,
+            is_active=True,
+        ).order_by("bin_code")
 
     if request.method == "POST" and form.is_valid() and formset.is_valid():
         receipt = form.save(commit=False)
@@ -1202,6 +1351,13 @@ def goods_received_update_view(request, pk):
 
     form = GoodsReceiptForm(request.POST or None, instance=receipt)
     formset = GoodsReceiptItemFormSet(request.POST or None, instance=receipt, prefix="items")
+
+    selected_store_id = request.POST.get("destination_store") if request.method == "POST" else receipt.destination_store_id
+    if selected_store_id:
+        form.fields["destination_bin"].queryset = StorageBin.objects.filter(
+            store_location_id=selected_store_id,
+            is_active=True,
+        ).order_by("bin_code")
 
     if request.method == "POST" and form.is_valid() and formset.is_valid():
         receipt = form.save()

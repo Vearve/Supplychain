@@ -56,6 +56,39 @@
 {% block scripts %}
 <script>
 (function () {
+    const destinationStore = document.getElementById('id_destination_store');
+    const destinationBin = document.getElementById('id_destination_bin');
+
+    function loadDestinationBins(storeId) {
+        if (!destinationBin) return;
+        const current = destinationBin.value;
+        destinationBin.innerHTML = '<option value="">---------</option>';
+        if (!storeId) return;
+
+        fetch('/workspace/api/store/' + storeId + '/bins/')
+            .then(r => r.json())
+            .then(data => {
+                data.bins.forEach(function (b) {
+                    const opt = document.createElement('option');
+                    opt.value = b.id;
+                    opt.textContent = b.label;
+                    destinationBin.appendChild(opt);
+                });
+                if (current) {
+                    destinationBin.value = current;
+                }
+            });
+    }
+
+    if (destinationStore && destinationBin) {
+        destinationStore.addEventListener('change', function () {
+            loadDestinationBins(this.value);
+        });
+        if (destinationStore.value) {
+            loadDestinationBins(destinationStore.value);
+        }
+    }
+
     const totalForms = document.getElementById('id_items-TOTAL_FORMS');
     const tbody = document.querySelector('#items-table tbody');
     const addBtn = document.getElementById('add-item-btn');

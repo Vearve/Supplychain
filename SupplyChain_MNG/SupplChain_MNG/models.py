@@ -125,6 +125,19 @@ class Project(models.Model):
         return self.name
 
 
+class Warehouse(models.Model):
+    name = models.CharField(max_length=120, unique=True)
+    location = models.CharField(max_length=200, blank=True)
+    description = models.TextField(blank=True)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+
 class StoreLocation(models.Model):
     LOCATION_TYPE_CHOICES = [
         ("HQ", "Main Warehouse"),
@@ -135,11 +148,21 @@ class StoreLocation(models.Model):
 
     name = models.CharField(max_length=120, unique=True)
     location_type = models.CharField(max_length=12, choices=LOCATION_TYPE_CHOICES, default="SITE")
+    warehouse = models.ForeignKey(Warehouse, on_delete=models.SET_NULL, null=True, blank=True, related_name="store_locations")
     project = models.ForeignKey(Project, on_delete=models.SET_NULL, null=True, blank=True, related_name="store_locations")
     is_active = models.BooleanField(default=True)
 
     class Meta:
         ordering = ["name"]
+
+    def clean(self):
+        errors = {}
+        if self.location_type in {"HQ", "SITE"} and not self.warehouse_id:
+            errors["warehouse"] = "Warehouse is required for HQ and Site stores."
+        if self.location_type == "SITE" and not self.project_id:
+            errors["project"] = "Project/Site is required when location type is SITE."
+        if errors:
+            raise ValidationError(errors)
 
     def __str__(self):
         return self.name
@@ -669,6 +692,7 @@ class GoodsReceipt(models.Model):
     receipt_number = models.CharField(max_length=24, unique=True, blank=True)
     date_received = models.DateField(default=timezone.localdate)
     destination_store = models.ForeignKey(StoreLocation, on_delete=models.PROTECT, related_name="goods_receipts")
+    destination_bin = models.ForeignKey(StorageBin, on_delete=models.PROTECT, related_name="goods_receipts", null=True, blank=True)
     source_type = models.CharField(max_length=12, choices=SOURCE_CHOICES, default="HQ")
     source_reference = models.CharField(max_length=120, blank=True)
     related_delivery_note = models.ForeignKey(DeliveryNote, on_delete=models.SET_NULL, null=True, blank=True)
@@ -706,6 +730,15 @@ class GoodsReceipt(models.Model):
         if not self.receipt_number:
             self.receipt_number = self._generate_receipt_number()
         super().save(*args, **kwargs)
+
+    def clean(self):
+        errors = {}
+        if not self.destination_bin_id:
+            errors["destination_bin"] = "Put-away BIN is required for stock-in."
+        elif self.destination_store_id and self.destination_bin.store_location_id != self.destination_store_id:
+            errors["destination_bin"] = "Destination BIN must belong to selected destination store."
+        if errors:
+            raise ValidationError(errors)
 
     def __str__(self):
         return self.receipt_number

@@ -5,6 +5,13 @@
 
 {% block content %}
 <section class="cards" style="margin-bottom: 12px;">
+    <article class="metric"><div class="label">Active Warehouses</div><div class="value">{{ active_warehouse_count }}</div></article>
+    <article class="metric"><div class="label">Stores In Warehouses</div><div class="value">{{ warehouse_store_count }}</div></article>
+    <article class="metric"><div class="label">Warehouse Stock Lines</div><div class="value">{{ warehouse_stock_lines }}</div></article>
+    <article class="metric"><div class="label">Warehouse Low Stock</div><div class="value">{{ warehouse_low_stock_materials }}</div></article>
+</section>
+
+<section class="cards" style="margin-bottom: 12px;">
     <article class="metric"><div class="label">Active Stores</div><div class="value">{{ active_store_count }}</div></article>
     <article class="metric"><div class="label">Active Bins</div><div class="value">{{ active_bin_count }}</div></article>
     <article class="metric"><div class="label">Stock Lines</div><div class="value">{{ stock_line_count }}</div></article>
@@ -14,28 +21,87 @@
 <div class="panel panel-pad" style="margin-bottom: 12px; display: flex; gap: 8px; flex-wrap: wrap;">
     <a class="btn btn-neutral" href="{% url 'settings' %}">← Back to Settings</a>
     {% if can_manage_current %}
+    <a class="btn btn-primary" href="{% url 'record_create' 'warehouses' %}">Add Warehouse</a>
     <a class="btn btn-primary" href="{% url 'record_create' 'store-locations' %}">Add Store Location</a>
     <a class="btn btn-primary" href="{% url 'record_create' 'storage-bins' %}">Add BIN</a>
     <a class="btn btn-primary" href="{% url 'record_create' 'inventory-balances' %}">Set Inventory Balance</a>
+    <a class="btn btn-primary" href="{% url 'warehouse_transfer_preset' %}">Warehouse → Site Transfer</a>
     {% if can_access_scope_admin %}
     <a class="btn btn-primary" href="{% url 'record_create' 'user-store-scopes' %}">Assign User Store Scope</a>
     {% endif %}
     {% endif %}
+    <a class="btn btn-neutral" href="{% url 'export_records' 'warehouses' 'csv' %}">Warehouses CSV</a>
     <a class="btn btn-neutral" href="{% url 'export_records' 'store-locations' 'csv' %}">Stores CSV</a>
     <a class="btn btn-neutral" href="{% url 'export_records' 'storage-bins' 'csv' %}">Bins CSV</a>
     <a class="btn btn-neutral" href="{% url 'export_records' 'inventory-balances' 'excel' %}">Balances Excel</a>
 </div>
 
+<section class="panel panel-pad table-wrap" style="margin-bottom: 12px;">
+    <h3 style="margin-top: 0;">Warehouses</h3>
+    <table>
+        <thead><tr><th>Name</th><th>Location</th><th>Description</th><th>Status</th><th>Actions</th></tr></thead>
+        <tbody>
+            {% for item in warehouse_rows %}
+            <tr>
+                <td>{{ item.name }}</td>
+                <td>{{ item.location|default:'-' }}</td>
+                <td>{{ item.description|default:'-' }}</td>
+                <td>{% if item.is_active %}<span class="badge badge-ok">Active</span>{% else %}<span class="badge badge-neutral">Inactive</span>{% endif %}</td>
+                <td>
+                    {% if can_manage_current %}
+                    <a class="btn btn-neutral btn-sm" href="{% url 'record_update' 'warehouses' item.id %}">Edit</a>
+                    <a class="btn btn-danger btn-sm" href="{% url 'record_delete' 'warehouses' item.id %}">Delete</a>
+                    {% else %}
+                    <span class="badge badge-neutral">View Only</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5">No warehouses found.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+
+<section class="panel panel-pad table-wrap" style="margin-bottom: 12px;">
+    <h3 style="margin-top: 0;">Warehouse Insights</h3>
+    <table>
+        <thead><tr><th>Warehouse</th><th>Total Qty</th><th>Low Stock Materials</th><th>Dead Stock (90d)</th><th>Top Materials</th></tr></thead>
+        <tbody>
+            {% for row in warehouse_insights %}
+            <tr>
+                <td>{{ row.warehouse.name }}</td>
+                <td>{{ row.total_qty }}</td>
+                <td>{{ row.low_stock_count }}</td>
+                <td>{{ row.dead_stock_count }}</td>
+                <td>
+                    {% if row.top_materials %}
+                        {% for item in row.top_materials %}
+                            {{ item.material__name }} ({{ item.total }}){% if not forloop.last %}, {% endif %}
+                        {% endfor %}
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5">No warehouse analytics available yet.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+
 <section class="split" style="margin-bottom: 12px;">
     <div class="panel panel-pad table-wrap">
         <h3 style="margin-top: 0;">Store Locations</h3>
         <table>
-            <thead><tr><th>Name</th><th>Type</th><th>Project/Site</th><th>Status</th><th>Actions</th></tr></thead>
+            <thead><tr><th>Name</th><th>Type</th><th>Warehouse</th><th>Project/Site</th><th>Status</th><th>Actions</th></tr></thead>
             <tbody>
                 {% for item in store_rows %}
                 <tr>
                     <td>{{ item.name }}</td>
                     <td>{{ item.get_location_type_display }}</td>
+                    <td>{{ item.warehouse.name|default:'-' }}</td>
                     <td>{{ item.project.name|default:'-' }}</td>
                     <td>{% if item.is_active %}<span class="badge badge-ok">Active</span>{% else %}<span class="badge badge-neutral">Inactive</span>{% endif %}</td>
                     <td>
@@ -48,7 +114,7 @@
                     </td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="5">No store locations found.</td></tr>
+                <tr><td colspan="6">No store locations found.</td></tr>
                 {% endfor %}
             </tbody>
         </table>

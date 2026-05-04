@@ -24,6 +24,7 @@ from .models import (
     Requisition,
     RequisitionReadReceipt,
     RequisitionReservation,
+    Warehouse,
     StoreLocation,
     StorageBin,
     InventoryBalance,
@@ -106,9 +107,16 @@ class ProjectAdmin(admin.ModelAdmin):
 
 @admin.register(StoreLocation)
 class StoreLocationAdmin(admin.ModelAdmin):
-    list_display = ['name', 'location_type', 'project', 'is_active']
-    search_fields = ['name', 'project__name']
-    list_filter = ['location_type', 'is_active']
+    list_display = ['name', 'location_type', 'warehouse', 'project', 'is_active']
+    search_fields = ['name', 'warehouse__name', 'project__name']
+    list_filter = ['location_type', 'warehouse', 'is_active']
+
+
+@admin.register(Warehouse)
+class WarehouseAdmin(admin.ModelAdmin):
+    list_display = ['name', 'location', 'is_active']
+    search_fields = ['name', 'location']
+    list_filter = ['is_active']
 
 
 @admin.register(StorageBin)

@@ -12,6 +12,7 @@ urlpatterns = [
     path('workspace/requisitions/<int:pk>/', views.requisition_detail_view, name='requisition_detail'),
     path('workspace/projects-sites/', views.projects_view, name='projects'),
     path('workspace/inventory-management/', views.inventory_management_view, name='inventory_management'),
+    path('workspace/inventory-management/warehouse-transfer/', views.warehouse_transfer_preset_view, name='warehouse_transfer_preset'),
     path('workspace/store-scope/', views.store_scope_view, name='store_scope'),
     path('workspace/material-returns/', views.material_returns_view, name='material_returns'),
     path('workspace/goods-received/', views.goods_received_view, name='goods_received'),

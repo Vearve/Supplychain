@@ -33,6 +33,7 @@ from .models import (
     StorageBin,
     StockTransaction,
     SubCategory,
+    Warehouse,
     UserStoreScope,
 )
 
@@ -109,10 +110,16 @@ class ProjectForm(forms.ModelForm):
         fields = ["name", "location", "description"]
 
 
+class WarehouseForm(forms.ModelForm):
+    class Meta:
+        model = Warehouse
+        fields = ["name", "location", "description", "is_active"]
+
+
 class StoreLocationForm(forms.ModelForm):
     class Meta:
         model = StoreLocation
-        fields = ["name", "location_type", "project", "is_active"]
+        fields = ["name", "location_type", "warehouse", "project", "is_active"]
 
 
 class StorageBinForm(forms.ModelForm):
@@ -295,6 +302,7 @@ class GoodsReceiptForm(forms.ModelForm):
         fields = [
             "date_received",
             "destination_store",
+            "destination_bin",
             "source_type",
             "source_reference",
             "related_delivery_note",
@@ -306,6 +314,30 @@ class GoodsReceiptForm(forms.ModelForm):
         widgets = {
             "date_received": DateInput(),
         }
+
+
+class WarehouseTransferPresetForm(forms.Form):
+    source_store = forms.ModelChoiceField(queryset=StoreLocation.objects.filter(is_active=True).order_by("name"))
+    source_bin = forms.ModelChoiceField(queryset=StorageBin.objects.filter(is_active=True).order_by("store_location__name", "bin_code"))
+    destination_store = forms.ModelChoiceField(queryset=StoreLocation.objects.filter(is_active=True).order_by("name"))
+    destination_bin = forms.ModelChoiceField(queryset=StorageBin.objects.filter(is_active=True).order_by("store_location__name", "bin_code"))
+    material = forms.ModelChoiceField(queryset=Material.objects.order_by("name"))
+    quantity = forms.DecimalField(max_digits=12, decimal_places=2, min_value=Decimal("0.01"))
+    reference_number = forms.CharField(max_length=60, required=False)
+    notes = forms.CharField(widget=forms.Textarea(attrs={"rows": 3}), required=False)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["source_store"].queryset = StoreLocation.objects.filter(
+            is_active=True,
+            location_type="HQ",
+            warehouse__isnull=False,
+        ).order_by("warehouse__name", "name")
+        self.fields["destination_store"].queryset = StoreLocation.objects.filter(
+            is_active=True,
+            location_type="SITE",
+            warehouse__isnull=False,
+        ).order_by("warehouse__name", "name")
 
 
 class GoodsReceiptItemForm(forms.ModelForm):
