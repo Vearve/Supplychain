@@ -1385,31 +1385,27 @@ def warehouse_manage_view(request, pk):
                     storage_bin__store_location__warehouse=warehouse,
                 )
             )
-            if existing_balances:
-                total_on_hand = sum(b.on_hand for b in existing_balances)
-                total_reserved = sum(b.reserved for b in existing_balances)
-                # Delete records not at the target bin
-                for b in existing_balances:
-                    if b.storage_bin_id != target_bin.id:
-                        b.delete()
-                # Update or create the balance at target bin
-                target_balance, created = InventoryBalance.objects.get_or_create(
-                    material=alloc_material,
-                    storage_bin=target_bin,
-                    defaults={"on_hand": total_on_hand, "reserved": total_reserved},
-                )
-                if not created:
-                    target_balance.on_hand = total_on_hand
-                    target_balance.reserved = total_reserved
-                    target_balance.save(update_fields=["on_hand", "reserved", "updated_at"])
-                messages.success(
-                    request,
-                    f"{alloc_material.name} allocated to {target_bin.bin_code} "
-                    f"({target_bin.zone or '—'} / {target_bin.aisle or '—'} / "
-                    f"{target_bin.rack or '—'} / {target_bin.shelf or '—'}).",
-                )
+            total_on_hand = sum(b.on_hand for b in existing_balances)
+            total_reserved = sum(b.reserved for b in existing_balances)
+            # Move any existing stock from other bins to the target bin
+            for b in existing_balances:
+                if b.storage_bin_id != target_bin.id:
+                    b.delete()
+            # Upsert balance at target bin (creates a zero-balance record if none existed)
+            target_balance, created = InventoryBalance.objects.get_or_create(
+                material=alloc_material,
+                storage_bin=target_bin,
+                defaults={"on_hand": total_on_hand, "reserved": total_reserved},
+            )
+            if not created:
+                target_balance.on_hand = total_on_hand
+                target_balance.reserved = total_reserved
+                target_balance.save(update_fields=["on_hand", "reserved", "updated_at"])
+            bin_label = " / ".join(filter(None, [target_bin.zone, target_bin.aisle, target_bin.rack, target_bin.shelf, target_bin.bin_code]))
+            if created and total_on_hand == 0:
+                messages.success(request, f"{alloc_material.name} allocated to {bin_label}. No stock yet — use Stock In to add quantity.")
             else:
-                messages.warning(request, f"No inventory balance found for {alloc_material.name} in this warehouse.")
+                messages.success(request, f"{alloc_material.name} allocated to {bin_label}.")
             return redirect("warehouse_manage", pk=warehouse.pk)
 
     # Materials summary — aggregate per material across all bins in this warehouse
