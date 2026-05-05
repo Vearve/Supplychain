@@ -1451,26 +1451,41 @@ def warehouse_manage_view(request, pk):
         if zone_key not in _tree:
             _tree[zone_key] = {"__bins__": {}, "aisles": {}, "__store_id__": sid}
         if not aisle_key:
-            _tree[zone_key]["__bins__"].setdefault(bin_code, []).append(item)
+            _bins = _tree[zone_key]["__bins__"]
+            if bin_code not in _bins:
+                _bins[bin_code] = {"pk": b.storage_bin.pk, "items": []}
+            _bins[bin_code]["items"].append(item)
         else:
             _z = _tree[zone_key]["aisles"]
             if aisle_key not in _z:
                 _z[aisle_key] = {"__bins__": {}, "racks": {}, "__store_id__": sid}
             if not rack_key:
-                _z[aisle_key]["__bins__"].setdefault(bin_code, []).append(item)
+                _bins = _z[aisle_key]["__bins__"]
+                if bin_code not in _bins:
+                    _bins[bin_code] = {"pk": b.storage_bin.pk, "items": []}
+                _bins[bin_code]["items"].append(item)
             else:
                 _a = _z[aisle_key]["racks"]
                 if rack_key not in _a:
                     _a[rack_key] = {"__bins__": {}, "shelves": {}, "__store_id__": sid}
                 if not shelf_key:
-                    _a[rack_key]["__bins__"].setdefault(bin_code, []).append(item)
+                    _bins = _a[rack_key]["__bins__"]
+                    if bin_code not in _bins:
+                        _bins[bin_code] = {"pk": b.storage_bin.pk, "items": []}
+                    _bins[bin_code]["items"].append(item)
                 else:
                     if shelf_key not in _a[rack_key]["shelves"]:
                         _a[rack_key]["shelves"][shelf_key] = {"__store_id__": sid, "__bins__": {}}
-                    _a[rack_key]["shelves"][shelf_key]["__bins__"].setdefault(bin_code, []).append(item)
+                    _bins = _a[rack_key]["shelves"][shelf_key]["__bins__"]
+                    if bin_code not in _bins:
+                        _bins[bin_code] = {"pk": b.storage_bin.pk, "items": []}
+                    _bins[bin_code]["items"].append(item)
 
     def _bin_list(d):
-        return [{"bin_code": bc, "items": items} for bc, items in sorted(d.items())]
+        return [
+            {"bin_code": bc, "bin_id": info["pk"], "items": info["items"]}
+            for bc, info in sorted(d.items())
+        ]
 
     layout_data = []
     for zone_key in sorted(_tree):
@@ -1648,6 +1663,115 @@ def warehouse_quick_create_bin(request, pk):
         "store_location_id": store.id,
         "label": " / ".join(label_parts),
     })
+
+
+@login_required
+def warehouse_rename_level(request, pk):
+    """AJAX POST: rename a zone/aisle/rack/shelf value across all matching bins."""
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    _enforce_manage_access(request.user, "warehouse")
+    warehouse = get_object_or_404(Warehouse, pk=pk)
+    level = request.POST.get("level", "").strip()
+    old_val = request.POST.get("old_value", "").strip()
+    new_val = request.POST.get("new_value", "").strip()
+    store_id = request.POST.get("store_id", "").strip()
+    parent_zone  = request.POST.get("zone", "").strip()
+    parent_aisle = request.POST.get("aisle", "").strip()
+    parent_rack  = request.POST.get("rack", "").strip()
+    if level not in ("zone", "aisle", "rack", "shelf"):
+        return JsonResponse({"error": "Invalid level."}, status=400)
+    if not new_val:
+        return JsonResponse({"error": "New name cannot be empty."}, status=400)
+    qs = StorageBin.objects.filter(store_location__warehouse=warehouse)
+    if store_id:
+        qs = qs.filter(store_location_id=store_id)
+    if level == "aisle":
+        qs = qs.filter(zone=parent_zone)
+    elif level == "rack":
+        qs = qs.filter(zone=parent_zone, aisle=parent_aisle)
+    elif level == "shelf":
+        qs = qs.filter(zone=parent_zone, aisle=parent_aisle, rack=parent_rack)
+    count = qs.filter(**{level: old_val}).update(**{level: new_val})
+    return JsonResponse({"success": True, "count": count})
+
+
+@login_required
+def warehouse_delete_level(request, pk):
+    """AJAX POST: delete all bins (and their balances) under a zone/aisle/rack/shelf."""
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    _enforce_manage_access(request.user, "warehouse")
+    warehouse = get_object_or_404(Warehouse, pk=pk)
+    level = request.POST.get("level", "").strip()
+    val   = request.POST.get("value", "").strip()
+    store_id = request.POST.get("store_id", "").strip()
+    parent_zone  = request.POST.get("zone", "").strip()
+    parent_aisle = request.POST.get("aisle", "").strip()
+    parent_rack  = request.POST.get("rack", "").strip()
+    if level not in ("zone", "aisle", "rack", "shelf"):
+        return JsonResponse({"error": "Invalid level."}, status=400)
+    qs = StorageBin.objects.filter(store_location__warehouse=warehouse)
+    if store_id:
+        qs = qs.filter(store_location_id=store_id)
+    if level == "aisle":
+        qs = qs.filter(zone=parent_zone)
+    elif level == "rack":
+        qs = qs.filter(zone=parent_zone, aisle=parent_aisle)
+    elif level == "shelf":
+        qs = qs.filter(zone=parent_zone, aisle=parent_aisle, rack=parent_rack)
+    deleted, _ = qs.filter(**{level: val}).delete()
+    return JsonResponse({"success": True, "deleted": deleted})
+
+
+@login_required
+def warehouse_edit_bin(request, pk, bin_id):
+    """AJAX POST: update a StorageBin's code and position fields."""
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    _enforce_manage_access(request.user, "warehouse")
+    warehouse = get_object_or_404(Warehouse, pk=pk)
+    sbin = get_object_or_404(StorageBin, pk=bin_id, store_location__warehouse=warehouse)
+    bin_code = request.POST.get("bin_code", sbin.bin_code).strip()
+    zone  = request.POST.get("zone",  sbin.zone  or "").strip()
+    aisle = request.POST.get("aisle", sbin.aisle or "").strip()
+    rack  = request.POST.get("rack",  sbin.rack  or "").strip()
+    shelf = request.POST.get("shelf", sbin.shelf or "").strip()
+    if not bin_code:
+        return JsonResponse({"error": "Bin code cannot be empty."}, status=400)
+    if StorageBin.objects.filter(store_location=sbin.store_location, bin_code=bin_code).exclude(pk=bin_id).exists():
+        return JsonResponse({"error": f"Bin '{bin_code}' already exists in this store."}, status=400)
+    sbin.bin_code = bin_code
+    sbin.zone  = zone
+    sbin.aisle = aisle
+    sbin.rack  = rack
+    sbin.shelf = shelf
+    sbin.save(update_fields=["bin_code", "zone", "aisle", "rack", "shelf"])
+    return JsonResponse({"success": True})
+
+
+@login_required
+def warehouse_delete_bin(request, pk, bin_id):
+    """AJAX POST: delete a StorageBin and all its InventoryBalance records."""
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    _enforce_manage_access(request.user, "warehouse")
+    warehouse = get_object_or_404(Warehouse, pk=pk)
+    sbin = get_object_or_404(StorageBin, pk=bin_id, store_location__warehouse=warehouse)
+    sbin.delete()
+    return JsonResponse({"success": True})
+
+
+@login_required
+def warehouse_deallocate_balance(request, pk, balance_id):
+    """AJAX POST: remove a single InventoryBalance (deallocate material from bin)."""
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    _enforce_manage_access(request.user, "warehouse")
+    warehouse = get_object_or_404(Warehouse, pk=pk)
+    balance = get_object_or_404(InventoryBalance, pk=balance_id, storage_bin__store_location__warehouse=warehouse)
+    balance.delete()
+    return JsonResponse({"success": True})
 
 
 @login_required

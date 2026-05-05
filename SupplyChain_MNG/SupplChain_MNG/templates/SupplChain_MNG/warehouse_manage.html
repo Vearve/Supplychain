@@ -385,56 +385,45 @@
         <div id="layoutAccordion">
             {% for zone in layout_data %}
             <details class="acc-zone" id="zone-{{ zone.zone|slugify }}">
-                <summary>
-                    <span>📦 Zone: {{ zone.zone }}</span>
-                    <span class="acc-arrow">▶</span>
-                    <button type="button" class="layout-add-btn" title="Add Aisle to {{ zone.zone }}"
-                        data-store="{{ zone.store_location_id }}"
-                        data-zone="{{ zone.zone_val }}" data-aisle="" data-rack="" data-shelf=""
-                        data-ask="aisle" data-label="New Aisle in Zone {{ zone.zone }}"
-                        onclick="event.stopPropagation();openLayoutBinCreate(this)">＋ Aisle</button>
-                </summary>
-                <div class="acc-zone-body">
-
-                    {# ── Bins directly in this zone (no aisle set) ── #}
-                    {% for bin in zone.bins_direct %}
-                    <div style="margin-bottom:6px;">
-                        <div style="font-size:0.78rem; font-weight:700; color:var(--brand); margin-bottom:4px;">🗂 Bin: {{ bin.bin_code }}</div>
-                        {% for item in bin.items %}
-                        <div class="bin-row bin-row-click" data-balance-id="{{ item.balance_id }}">
-                            <span class="bin-material">{{ item.material_name }}</span>
-                            <span style="font-size:0.78rem; color:var(--muted);">{{ item.material_code }}</span>
-                            <span class="bin-qty">On Hand: <strong>{{ item.on_hand }}</strong></span>
-                            <span class="bin-qty">Avail: <strong class="{% if item.available > 0 %}qty-pos{% elif item.available == 0 %}qty-zero{% else %}qty-neg{% endif %}">{{ item.available }}</strong></span>
-                            {% if item.status == 'low_stock' %}<span class="badge badge-warn" style="font-size:0.7rem;padding:2px 6px;">Low</span>{% endif %}
-                            {% if item.status == 'out_of_stock' %}<span class="badge" style="background:var(--bad);color:#fff;font-size:0.7rem;padding:2px 6px;">Out</span>{% endif %}
-                            <span style="margin-left:auto;color:var(--muted);font-size:0.85rem;">›</span>
-                        </div>
-                        {% endfor %}
-                    </div>
-                    {% endfor %}
-
-                    {# ── Aisles ── #}
-                    {% if not zone.aisles %}
-                    <div style="color:var(--muted);font-size:0.83rem;padding:6px 0 2px;">No aisles yet — use ＋ Aisle above to add one.</div>
-                    {% endif %}
-                    {% for aisle_obj in zone.aisles %}
-                    <details class="acc-aisle">
+                {% if layout_data %}
+                <div id="layoutAccordion">
+                    {% for zone in layout_data %}
+                    <details class="acc-zone" id="zone-{{ zone.zone|slugify }}">
                         <summary>
-                            <span>🛤 Aisle: {{ aisle_obj.aisle }}</span>
+                            <span>📦 Zone: {{ zone.zone }}</span>
                             <span class="acc-arrow">▶</span>
-                            <button type="button" class="layout-add-btn" title="Add Rack to {{ aisle_obj.aisle }}"
-                                data-store="{{ aisle_obj.store_location_id }}"
-                                data-zone="{{ zone.zone_val }}" data-aisle="{{ aisle_obj.aisle_val }}" data-rack="" data-shelf=""
-                                data-ask="rack" data-label="New Rack in Aisle {{ aisle_obj.aisle }}"
-                                onclick="event.stopPropagation();openLayoutBinCreate(this)">＋ Rack</button>
+                            <span class="layout-action-group" onclick="event.stopPropagation()">
+                                <button type="button" class="layout-add-btn" title="Add Aisle"
+                                    data-store="{{ zone.store_location_id }}" data-zone="{{ zone.zone_val }}" data-aisle="" data-rack="" data-shelf=""
+                                    data-ask="aisle" data-label="New Aisle in Zone {{ zone.zone }}"
+                                    onclick="openLayoutBinCreate(this)">＋</button>
+                                <button type="button" class="layout-crud-btn layout-edit-btn" title="Rename zone"
+                                    data-level="zone" data-val="{{ zone.zone_val }}" data-store="{{ zone.store_location_id }}"
+                                    data-zone="" data-aisle="" data-rack="" data-display="{{ zone.zone }}"
+                                    onclick="openRenameLevel(this)">✏</button>
+                                <button type="button" class="layout-crud-btn layout-del-btn" title="Delete zone"
+                                    data-level="zone" data-val="{{ zone.zone_val }}" data-store="{{ zone.store_location_id }}"
+                                    data-zone="" data-aisle="" data-rack="" data-label="Zone {{ zone.zone }}"
+                                    onclick="deleteLevelConfirm(this)">🗑</button>
+                            </span>
                         </summary>
-                        <div class="acc-aisle-body">
+                        <div class="acc-zone-body">
 
-                            {# Bins directly in this aisle (no rack set) #}
-                            {% for bin in aisle_obj.bins_direct %}
-                            <div style="margin-bottom:6px;">
-                                <div style="font-size:0.78rem; font-weight:700; color:var(--brand); margin-bottom:4px;">🗂 Bin: {{ bin.bin_code }}</div>
+                            {# ── Bins directly in this zone ── #}
+                            {% for bin in zone.bins_direct %}
+                            <div class="bin-block">
+                                <div class="bin-header-row">
+                                    <span>🗂 Bin: {{ bin.bin_code }}</span>
+                                    <span class="layout-action-group">
+                                        <button type="button" class="layout-crud-btn layout-edit-btn" title="Edit bin"
+                                            data-bin-id="{{ bin.bin_id }}" data-bin-code="{{ bin.bin_code }}"
+                                            data-zone="{{ zone.zone_val }}" data-aisle="" data-rack="" data-shelf=""
+                                            onclick="openEditBin(this)">✏</button>
+                                        <button type="button" class="layout-crud-btn layout-del-btn" title="Delete bin"
+                                            data-bin-id="{{ bin.bin_id }}" data-label="Bin {{ bin.bin_code }}"
+                                            onclick="deleteBinConfirm(this)">🗑</button>
+                                    </span>
+                                </div>
                                 {% for item in bin.items %}
                                 <div class="bin-row bin-row-click" data-balance-id="{{ item.balance_id }}">
                                     <span class="bin-material">{{ item.material_name }}</span>
@@ -449,26 +438,47 @@
                             </div>
                             {% endfor %}
 
-                            {% if not aisle_obj.racks %}
-                            <div style="color:var(--muted);font-size:0.83rem;padding:6px 0 2px 8px;">No racks yet — use ＋ Rack above to add one.</div>
+                            {# ── Aisles ── #}
+                            {% if not zone.aisles and not zone.bins_direct %}
+                            <div style="color:var(--muted);font-size:0.83rem;padding:6px 0 2px;">No aisles yet — use ＋ above to add one.</div>
                             {% endif %}
-                            {% for rack_obj in aisle_obj.racks %}
-                            <details class="acc-rack">
+                            {% for aisle_obj in zone.aisles %}
+                            <details class="acc-aisle">
                                 <summary>
-                                    <span>🗄 Rack: {{ rack_obj.rack }}</span>
+                                    <span>🛤 Aisle: {{ aisle_obj.aisle }}</span>
                                     <span class="acc-arrow">▶</span>
-                                    <button type="button" class="layout-add-btn" title="Add Shelf to {{ rack_obj.rack }}"
-                                        data-store="{{ rack_obj.store_location_id }}"
-                                        data-zone="{{ zone.zone_val }}" data-aisle="{{ aisle_obj.aisle_val }}" data-rack="{{ rack_obj.rack_val }}" data-shelf=""
-                                        data-ask="shelf" data-label="New Shelf in Rack {{ rack_obj.rack }}"
-                                        onclick="event.stopPropagation();openLayoutBinCreate(this)">＋ Shelf</button>
+                                    <span class="layout-action-group" onclick="event.stopPropagation()">
+                                        <button type="button" class="layout-add-btn" title="Add Rack"
+                                            data-store="{{ aisle_obj.store_location_id }}" data-zone="{{ zone.zone_val }}" data-aisle="{{ aisle_obj.aisle_val }}" data-rack="" data-shelf=""
+                                            data-ask="rack" data-label="New Rack in Aisle {{ aisle_obj.aisle }}"
+                                            onclick="openLayoutBinCreate(this)">＋</button>
+                                        <button type="button" class="layout-crud-btn layout-edit-btn" title="Rename aisle"
+                                            data-level="aisle" data-val="{{ aisle_obj.aisle_val }}" data-store="{{ aisle_obj.store_location_id }}"
+                                            data-zone="{{ zone.zone_val }}" data-aisle="" data-rack="" data-display="{{ aisle_obj.aisle }}"
+                                            onclick="openRenameLevel(this)">✏</button>
+                                        <button type="button" class="layout-crud-btn layout-del-btn" title="Delete aisle"
+                                            data-level="aisle" data-val="{{ aisle_obj.aisle_val }}" data-store="{{ aisle_obj.store_location_id }}"
+                                            data-zone="{{ zone.zone_val }}" data-aisle="" data-rack="" data-label="Aisle {{ aisle_obj.aisle }}"
+                                            onclick="deleteLevelConfirm(this)">🗑</button>
+                                    </span>
                                 </summary>
-                                <div class="acc-rack-body">
+                                <div class="acc-aisle-body">
 
-                                    {# Bins directly in this rack (no shelf set) #}
-                                    {% for bin in rack_obj.bins_direct %}
-                                    <div style="margin-bottom:6px;">
-                                        <div style="font-size:0.78rem; font-weight:700; color:var(--brand); margin-bottom:4px;">🗂 Bin: {{ bin.bin_code }}</div>
+                                    {# Bins directly in this aisle #}
+                                    {% for bin in aisle_obj.bins_direct %}
+                                    <div class="bin-block">
+                                        <div class="bin-header-row">
+                                            <span>🗂 Bin: {{ bin.bin_code }}</span>
+                                            <span class="layout-action-group">
+                                                <button type="button" class="layout-crud-btn layout-edit-btn" title="Edit bin"
+                                                    data-bin-id="{{ bin.bin_id }}" data-bin-code="{{ bin.bin_code }}"
+                                                    data-zone="{{ zone.zone_val }}" data-aisle="{{ aisle_obj.aisle_val }}" data-rack="" data-shelf=""
+                                                    onclick="openEditBin(this)">✏</button>
+                                                <button type="button" class="layout-crud-btn layout-del-btn" title="Delete bin"
+                                                    data-bin-id="{{ bin.bin_id }}" data-label="Bin {{ bin.bin_code }}"
+                                                    onclick="deleteBinConfirm(this)">🗑</button>
+                                            </span>
+                                        </div>
                                         {% for item in bin.items %}
                                         <div class="bin-row bin-row-click" data-balance-id="{{ item.balance_id }}">
                                             <span class="bin-material">{{ item.material_name }}</span>
@@ -483,24 +493,46 @@
                                     </div>
                                     {% endfor %}
 
-                                    {% if not rack_obj.shelves %}
-                                    <div style="color:var(--muted);font-size:0.83rem;padding:6px 0 2px 16px;">No shelves yet — use ＋ Shelf above to add one.</div>
+                                    {% if not aisle_obj.racks and not aisle_obj.bins_direct %}
+                                    <div style="color:var(--muted);font-size:0.83rem;padding:6px 0 2px 8px;">No racks yet — use ＋ above to add one.</div>
                                     {% endif %}
-                                    {% for shelf_obj in rack_obj.shelves %}
-                                    <details class="acc-shelf">
+                                    {% for rack_obj in aisle_obj.racks %}
+                                    <details class="acc-rack">
                                         <summary>
-                                            <span>📂 Shelf: {{ shelf_obj.shelf }}</span>
+                                            <span>🗄 Rack: {{ rack_obj.rack }}</span>
                                             <span class="acc-arrow">▶</span>
-                                            <button type="button" class="layout-add-btn" title="Add Bin to {{ shelf_obj.shelf }}"
-                                                data-store="{{ shelf_obj.store_location_id }}"
-                                                data-zone="{{ zone.zone_val }}" data-aisle="{{ aisle_obj.aisle_val }}" data-rack="{{ rack_obj.rack_val }}" data-shelf="{{ shelf_obj.shelf_val }}"
-                                                data-ask="bin" data-label="New Bin in Shelf {{ shelf_obj.shelf }}"
-                                                onclick="event.stopPropagation();openLayoutBinCreate(this)">＋ Bin</button>
+                                            <span class="layout-action-group" onclick="event.stopPropagation()">
+                                                <button type="button" class="layout-add-btn" title="Add Shelf"
+                                                    data-store="{{ rack_obj.store_location_id }}" data-zone="{{ zone.zone_val }}" data-aisle="{{ aisle_obj.aisle_val }}" data-rack="{{ rack_obj.rack_val }}" data-shelf=""
+                                                    data-ask="shelf" data-label="New Shelf in Rack {{ rack_obj.rack }}"
+                                                    onclick="openLayoutBinCreate(this)">＋</button>
+                                                <button type="button" class="layout-crud-btn layout-edit-btn" title="Rename rack"
+                                                    data-level="rack" data-val="{{ rack_obj.rack_val }}" data-store="{{ rack_obj.store_location_id }}"
+                                                    data-zone="{{ zone.zone_val }}" data-aisle="{{ aisle_obj.aisle_val }}" data-rack="" data-display="{{ rack_obj.rack }}"
+                                                    onclick="openRenameLevel(this)">✏</button>
+                                                <button type="button" class="layout-crud-btn layout-del-btn" title="Delete rack"
+                                                    data-level="rack" data-val="{{ rack_obj.rack_val }}" data-store="{{ rack_obj.store_location_id }}"
+                                                    data-zone="{{ zone.zone_val }}" data-aisle="{{ aisle_obj.aisle_val }}" data-rack="" data-label="Rack {{ rack_obj.rack }}"
+                                                    onclick="deleteLevelConfirm(this)">🗑</button>
+                                            </span>
                                         </summary>
-                                        <div class="acc-shelf-body">
-                                            {% for bin in shelf_obj.bins %}
-                                            <div style="margin-bottom:6px;">
-                                                <div style="font-size:0.78rem; font-weight:700; color:var(--brand); margin-bottom:4px;">🗂 Bin: {{ bin.bin_code }}</div>
+                                        <div class="acc-rack-body">
+
+                                            {# Bins directly in this rack #}
+                                            {% for bin in rack_obj.bins_direct %}
+                                            <div class="bin-block">
+                                                <div class="bin-header-row">
+                                                    <span>🗂 Bin: {{ bin.bin_code }}</span>
+                                                    <span class="layout-action-group">
+                                                        <button type="button" class="layout-crud-btn layout-edit-btn" title="Edit bin"
+                                                            data-bin-id="{{ bin.bin_id }}" data-bin-code="{{ bin.bin_code }}"
+                                                            data-zone="{{ zone.zone_val }}" data-aisle="{{ aisle_obj.aisle_val }}" data-rack="{{ rack_obj.rack_val }}" data-shelf=""
+                                                            onclick="openEditBin(this)">✏</button>
+                                                        <button type="button" class="layout-crud-btn layout-del-btn" title="Delete bin"
+                                                            data-bin-id="{{ bin.bin_id }}" data-label="Bin {{ bin.bin_code }}"
+                                                            onclick="deleteBinConfirm(this)">🗑</button>
+                                                    </span>
+                                                </div>
                                                 {% for item in bin.items %}
                                                 <div class="bin-row bin-row-click" data-balance-id="{{ item.balance_id }}">
                                                     <span class="bin-material">{{ item.material_name }}</span>
@@ -514,6 +546,62 @@
                                                 {% endfor %}
                                             </div>
                                             {% endfor %}
+
+                                            {% if not rack_obj.shelves and not rack_obj.bins_direct %}
+                                            <div style="color:var(--muted);font-size:0.83rem;padding:6px 0 2px 16px;">No shelves yet — use ＋ above to add one.</div>
+                                            {% endif %}
+                                            {% for shelf_obj in rack_obj.shelves %}
+                                            <details class="acc-shelf">
+                                                <summary>
+                                                    <span>📂 Shelf: {{ shelf_obj.shelf }}</span>
+                                                    <span class="acc-arrow">▶</span>
+                                                    <span class="layout-action-group" onclick="event.stopPropagation()">
+                                                        <button type="button" class="layout-add-btn" title="Add Bin"
+                                                            data-store="{{ shelf_obj.store_location_id }}" data-zone="{{ zone.zone_val }}" data-aisle="{{ aisle_obj.aisle_val }}" data-rack="{{ rack_obj.rack_val }}" data-shelf="{{ shelf_obj.shelf_val }}"
+                                                            data-ask="bin" data-label="New Bin in Shelf {{ shelf_obj.shelf }}"
+                                                            onclick="openLayoutBinCreate(this)">＋</button>
+                                                        <button type="button" class="layout-crud-btn layout-edit-btn" title="Rename shelf"
+                                                            data-level="shelf" data-val="{{ shelf_obj.shelf_val }}" data-store="{{ shelf_obj.store_location_id }}"
+                                                            data-zone="{{ zone.zone_val }}" data-aisle="{{ aisle_obj.aisle_val }}" data-rack="{{ rack_obj.rack_val }}" data-display="{{ shelf_obj.shelf }}"
+                                                            onclick="openRenameLevel(this)">✏</button>
+                                                        <button type="button" class="layout-crud-btn layout-del-btn" title="Delete shelf"
+                                                            data-level="shelf" data-val="{{ shelf_obj.shelf_val }}" data-store="{{ shelf_obj.store_location_id }}"
+                                                            data-zone="{{ zone.zone_val }}" data-aisle="{{ aisle_obj.aisle_val }}" data-rack="{{ rack_obj.rack_val }}" data-label="Shelf {{ shelf_obj.shelf }}"
+                                                            onclick="deleteLevelConfirm(this)">🗑</button>
+                                                    </span>
+                                                </summary>
+                                                <div class="acc-shelf-body">
+                                                    {% for bin in shelf_obj.bins %}
+                                                    <div class="bin-block">
+                                                        <div class="bin-header-row">
+                                                            <span>🗂 Bin: {{ bin.bin_code }}</span>
+                                                            <span class="layout-action-group">
+                                                                <button type="button" class="layout-crud-btn layout-edit-btn" title="Edit bin"
+                                                                    data-bin-id="{{ bin.bin_id }}" data-bin-code="{{ bin.bin_code }}"
+                                                                    data-zone="{{ zone.zone_val }}" data-aisle="{{ aisle_obj.aisle_val }}" data-rack="{{ rack_obj.rack_val }}" data-shelf="{{ shelf_obj.shelf_val }}"
+                                                                    onclick="openEditBin(this)">✏</button>
+                                                                <button type="button" class="layout-crud-btn layout-del-btn" title="Delete bin"
+                                                                    data-bin-id="{{ bin.bin_id }}" data-label="Bin {{ bin.bin_code }}"
+                                                                    onclick="deleteBinConfirm(this)">🗑</button>
+                                                            </span>
+                                                        </div>
+                                                        {% for item in bin.items %}
+                                                        <div class="bin-row bin-row-click" data-balance-id="{{ item.balance_id }}">
+                                                            <span class="bin-material">{{ item.material_name }}</span>
+                                                            <span style="font-size:0.78rem; color:var(--muted);">{{ item.material_code }}</span>
+                                                            <span class="bin-qty">On Hand: <strong>{{ item.on_hand }}</strong></span>
+                                                            <span class="bin-qty">Avail: <strong class="{% if item.available > 0 %}qty-pos{% elif item.available == 0 %}qty-zero{% else %}qty-neg{% endif %}">{{ item.available }}</strong></span>
+                                                            {% if item.status == 'low_stock' %}<span class="badge badge-warn" style="font-size:0.7rem;padding:2px 6px;">Low</span>{% endif %}
+                                                            {% if item.status == 'out_of_stock' %}<span class="badge" style="background:var(--bad);color:#fff;font-size:0.7rem;padding:2px 6px;">Out</span>{% endif %}
+                                                            <span style="margin-left:auto;color:var(--muted);font-size:0.85rem;">›</span>
+                                                        </div>
+                                                        {% endfor %}
+                                                    </div>
+                                                    {% endfor %}
+                                                </div>
+                                            </details>
+                                            {% endfor %}
+
                                         </div>
                                     </details>
                                     {% endfor %}
@@ -525,15 +613,7 @@
                         </div>
                     </details>
                     {% endfor %}
-
                 </div>
-            </details>
-            {% endfor %}
-        </div>
-        {% else %}
-        <div style="color:var(--muted); padding: 24px 0; text-align:center;">No allocations found for this warehouse yet. Use + Allocate Material to get started.</div>
-        {% endif %}
-    </section>
 </div><!-- /tab-layout -->
 
 <!-- ── Material Balance Detail Drawer ──────────────────────────────────── -->
@@ -592,6 +672,7 @@
                 <button onclick="saveBalanceEdit()" id="bdSaveBtn" style="width:100%;padding:8px;background:var(--brand);color:#fff;border:none;border-radius:8px;font-size:0.9rem;font-weight:600;cursor:pointer;">Save Changes</button>
             </div>
             <a id="bdEditLink" href="#" target="_blank" style="display:block;text-align:center;padding:9px;border:1px solid var(--line);border-radius:8px;color:var(--brand);text-decoration:none;font-size:0.88rem;font-weight:600;">✏ Edit Material Details</a>
+            <button onclick="deallocateBalance()" id="bdDeallocBtn" style="display:block;width:100%;margin-top:8px;padding:9px;border:1px solid var(--bad);border-radius:8px;background:transparent;color:var(--bad);font-size:0.88rem;font-weight:600;cursor:pointer;">🗑 Remove from Bin</button>
         </div>
     </div>
 </div>
@@ -612,6 +693,22 @@
     flex-shrink:0;
 }
 .layout-add-btn:hover { background:var(--brand); color:#fff; }
+.layout-action-group { display:inline-flex; gap:4px; margin-left:auto; align-items:center; flex-shrink:0; }
+.bin-header-row { display:flex; align-items:center; gap:6px; font-size:0.78rem; font-weight:700; color:var(--brand); margin-bottom:4px; }
+.bin-block { margin-bottom:6px; }
+.layout-crud-btn {
+    padding:2px 7px;
+    font-size:0.78rem;
+    border-radius:5px;
+    border:1px solid var(--line);
+    background:transparent;
+    cursor:pointer;
+    line-height:1.4;
+}
+.layout-edit-btn { color:var(--brand); }
+.layout-edit-btn:hover { background:var(--brand); color:#fff; border-color:var(--brand); }
+.layout-del-btn { color:var(--bad); }
+.layout-del-btn:hover { background:var(--bad); color:#fff; border-color:var(--bad); }
 </style>
 
 <!-- ══════════════════════════════════
@@ -1062,10 +1159,103 @@ var _qcConfig = {
         onSuccess: function() {
             window.location.reload();
         }
+    },
+    edit_bin: {
+        title: '',
+        endpoint: function(){ return '/workspace/warehouse-management/' + WH_PK + '/bin/' + _editBinId + '/edit/'; },
+        fields: function(){ return ''; },
+        payload: function() {
+            var fd = new FormData();
+            fd.append('bin_code', document.getElementById('qcBinCode').value.trim());
+            fd.append('zone',  document.getElementById('qcZone').value.trim());
+            fd.append('aisle', document.getElementById('qcAisle').value.trim());
+            fd.append('rack',  document.getElementById('qcRack').value.trim());
+            fd.append('shelf', document.getElementById('qcShelf').value.trim());
+            return fd;
+        },
+        onSuccess: function() {
+            window.location.reload();
+        }
     }
 };
 
 var _qcLayoutCtx = {};
+// ── Layout CRUD helpers ─────────────────────────────────────────────────
+function _layoutPost(url, fd, onOk) {
+    var csrf = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    fd.append('csrfmiddlewaretoken', csrf);
+    fetch(url, {method:'POST', body:fd, headers:{'X-Requested-With':'XMLHttpRequest'}})
+        .then(function(r){ return r.json().then(function(d){ return {ok:r.ok,data:d}; }); })
+        .then(function(res) {
+            if (res.ok && res.data.success) { onOk(); }
+            else { alert((res.data && res.data.error) || 'Error'); }
+        })
+        .catch(function(e){ alert('Network error: ' + e.message); });
+}
+
+// ── Rename level ─────────────────────────────────────────────────────────
+function openRenameLevel(btn) {
+    var d = btn.dataset;
+    var newName = prompt('Rename ' + d.level + ' "' + d.display + '" to:', d.display);
+    if (!newName || newName.trim() === d.display) return;
+    var fd = new FormData();
+    fd.append('level',    d.level);
+    fd.append('old_value', d.val);
+    fd.append('new_value', newName.trim());
+    fd.append('store_id',  d.store || '');
+    fd.append('zone',  d.zone  || '');
+    fd.append('aisle', d.aisle || '');
+    fd.append('rack',  d.rack  || '');
+    _layoutPost('/workspace/warehouse-management/' + WH_PK + '/level/rename/', fd,
+        function(){ window.location.reload(); });
+}
+
+// ── Delete level ─────────────────────────────────────────────────────────
+function deleteLevelConfirm(btn) {
+    var d = btn.dataset;
+    if (!confirm('Delete ' + d.label + ' and ALL its bins and stock records? This cannot be undone.')) return;
+    var fd = new FormData();
+    fd.append('level',   d.level);
+    fd.append('value',   d.val);
+    fd.append('store_id', d.store || '');
+    fd.append('zone',  d.zone  || '');
+    fd.append('aisle', d.aisle || '');
+    fd.append('rack',  d.rack  || '');
+    _layoutPost('/workspace/warehouse-management/' + WH_PK + '/level/delete/', fd,
+        function(){ window.location.reload(); });
+}
+
+// ── Edit bin ─────────────────────────────────────────────────────────────
+var _editBinId = null;
+function openEditBin(btn) {
+    _editBinId = btn.dataset.binId;
+    var d = btn.dataset;
+    _qcType = 'edit_bin';
+    document.getElementById('qcTitle').textContent = 'Edit Bin ' + d.binCode;
+    document.getElementById('qcError').style.display = 'none';
+    document.getElementById('qcFields').innerHTML =
+        _qcTextField('qcBinCode', 'Bin Code *', '') +
+        _qcTextField('qcZone',  'Zone',  '') +
+        _qcTextField('qcAisle', 'Aisle', '') +
+        _qcTextField('qcRack',  'Rack',  '') +
+        _qcTextField('qcShelf', 'Shelf', '');
+    document.getElementById('qcBinCode').value = d.binCode || '';
+    document.getElementById('qcZone').value  = d.zone  || '';
+    document.getElementById('qcAisle').value = d.aisle || '';
+    document.getElementById('qcRack').value  = d.rack  || '';
+    document.getElementById('qcShelf').value = d.shelf || '';
+    document.getElementById('qcModal').style.display = 'flex';
+}
+
+// ── Delete bin ───────────────────────────────────────────────────────────
+function deleteBinConfirm(btn) {
+    var d = btn.dataset;
+    if (!confirm('Delete ' + d.label + ' and all its stock records? This cannot be undone.')) return;
+    var fd = new FormData();
+    _layoutPost('/workspace/warehouse-management/' + WH_PK + '/bin/' + d.binId + '/delete/', fd,
+        function(){ window.location.reload(); });
+}
+
 
 function openLayoutBinCreate(btn) {
     _qcLayoutCtx = {
@@ -1303,6 +1493,25 @@ function saveBalanceEdit() {
     .then(function(res) {
         btn.disabled = false;
         btn.textContent = 'Save Changes';
+
+        function deallocateBalance() {
+            if (!_bdBalanceId) return;
+            if (!confirm('Remove this material from the bin? Stock records will be deleted.')) return;
+            var btn = document.getElementById('bdDeallocBtn');
+            btn.disabled = true;
+            btn.textContent = 'Removing…';
+            var fd = new FormData();
+            fd.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+            fetch('/workspace/warehouse-management/' + WH_PK + '/balance/' + _bdBalanceId + '/deallocate/', {
+                method:'POST', body:fd, headers:{'X-Requested-With':'XMLHttpRequest'}
+            })
+            .then(function(r){ return r.json(); })
+            .then(function(d) {
+                if (d.success) { window.location.reload(); }
+                else { btn.disabled = false; btn.textContent = '🗑 Remove from Bin'; alert(d.error || 'Error'); }
+            })
+            .catch(function(e){ btn.disabled = false; btn.textContent = '🗑 Remove from Bin'; alert('Network error: ' + e.message); });
+        }
         if (!res.ok || res.data.error) {
             var msg = typeof res.data.error === 'object' ? JSON.stringify(res.data.error) : (res.data.error || 'Error');
             errDiv.textContent = msg;
