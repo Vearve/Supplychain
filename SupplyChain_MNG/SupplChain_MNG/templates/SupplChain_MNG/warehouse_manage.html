@@ -59,31 +59,84 @@
         background: var(--card);
     }
 
-    .form-block h4 {
-        margin: 0 0 10px;
-    }
+    .form-block h4 { margin: 0 0 10px; }
+    .form-block p { margin: 0 0 10px; color: var(--muted); font-size: 0.88rem; }
 
-    .form-block p {
-        margin: 0 0 10px;
+    .field { margin-bottom: 8px; }
+    .field label { display: block; margin-bottom: 4px; font-size: 0.85rem; color: var(--muted); }
+
+    /* ── Tab Bar ── */
+    .wh-tabs { display: flex; gap: 4px; margin-bottom: 16px; border-bottom: 2px solid var(--line); padding-bottom: 0; flex-wrap: wrap; }
+    .wh-tab-btn {
+        padding: 8px 18px;
+        border: none;
+        border-bottom: 3px solid transparent;
+        background: transparent;
         color: var(--muted);
+        font-size: 0.92rem;
+        font-weight: 500;
+        cursor: pointer;
+        margin-bottom: -2px;
+        border-radius: 6px 6px 0 0;
+        transition: color 0.12s, border-color 0.12s;
+    }
+    .wh-tab-btn:hover { color: var(--text); }
+    .wh-tab-btn.active { color: var(--brand); border-bottom-color: var(--brand); background: var(--card); }
+    .wh-tab-panel { display: none; }
+    .wh-tab-panel.active { display: block; }
+
+    /* ── Accordion Layout ── */
+    .acc-zone, .acc-aisle, .acc-rack, .acc-shelf {
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        margin-bottom: 8px;
+        overflow: hidden;
+    }
+    .acc-zone > summary, .acc-aisle > summary, .acc-rack > summary, .acc-shelf > summary {
+        padding: 10px 14px;
+        font-weight: 600;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        list-style: none;
+        user-select: none;
+    }
+    .acc-zone > summary { background: var(--brand); color: #fff; font-size: 0.98rem; }
+    .acc-aisle > summary { background: var(--card); color: var(--text); font-size: 0.92rem; padding-left: 28px; }
+    .acc-rack > summary { background: var(--bg); color: var(--text); font-size: 0.88rem; padding-left: 44px; }
+    .acc-shelf > summary { background: var(--card); color: var(--muted); font-size: 0.85rem; padding-left: 60px; }
+    .acc-zone > summary::-webkit-details-marker,
+    .acc-aisle > summary::-webkit-details-marker,
+    .acc-rack > summary::-webkit-details-marker,
+    .acc-shelf > summary::-webkit-details-marker { display: none; }
+    .acc-zone-body { padding: 10px; }
+    .acc-aisle-body { padding: 8px 8px 8px 20px; }
+    .acc-rack-body { padding: 6px 6px 6px 36px; }
+    .acc-shelf-body { padding: 6px 6px 6px 52px; }
+    .bin-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 7px 10px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        margin-bottom: 5px;
+        background: var(--bg);
+        flex-wrap: wrap;
         font-size: 0.88rem;
     }
-
-    .field {
-        margin-bottom: 8px;
-    }
-
-    .field label {
-        display: block;
-        margin-bottom: 4px;
-        font-size: 0.85rem;
-        color: var(--muted);
-    }
+    .bin-label { font-weight: 600; color: var(--brand); min-width: 80px; }
+    .bin-material { flex: 1; }
+    .bin-qty { color: var(--muted); white-space: nowrap; }
+    .acc-arrow { font-size: 0.8rem; transition: transform 0.2s; margin-left: auto; margin-right: 4px; }
+    details[open] > summary .acc-arrow { transform: rotate(90deg); }
 </style>
+
 
 <section class="cards" style="margin-bottom: 12px;">
     <article class="metric"><div class="label">Stores</div><div class="value">{{ store_count }}</div></article>
-    <article class="metric"><div class="label">Bins (Zone/Aisle/Rack/Shelf/Bin)</div><div class="value">{{ bin_count }}</div></article>
+    <article class="metric"><div class="label">Bins</div><div class="value">{{ bin_count }}</div></article>
     <article class="metric"><div class="label">Stock Lines</div><div class="value">{{ stock_line_count }}</div></article>
     <article class="metric"><div class="label">Stock Quantity</div><div class="value">{{ warehouse_stock_qty }}</div></article>
     <article class="metric"><div class="label">Linked Projects</div><div class="value">{{ linked_project_count }}</div></article>
@@ -98,228 +151,360 @@
     <a class="btn btn-neutral" href="{% url 'inventory_management' %}">Inventory Setup</a>
 </div>
 
-<section class="panel panel-pad" style="margin-bottom: 12px;">
-    <h3 style="margin-top: 0;">Manage Warehouse Setup In One Place</h3>
-    <div class="form-grid">
-        <form class="form-block" method="post">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="create_store">
-            <h4>Create Store In This Warehouse</h4>
-            <p>Create HQ/Site store directly here and attach it to {{ warehouse.name }}.</p>
-            {% for field in store_form %}
-            <div class="field">
-                <label>{{ field.label }}</label>
-                {{ field }}
-                {% for err in field.errors %}<div style="color:var(--bad); font-size:0.82rem;">{{ err }}</div>{% endfor %}
-            </div>
-            {% endfor %}
-            <button type="submit" class="btn btn-primary">Save Store</button>
-        </form>
+<!-- ── Tab Bar ── -->
+<div class="wh-tabs">
+    <button class="wh-tab-btn active" onclick="switchTab('overview', this)">Overview</button>
+    <button class="wh-tab-btn" onclick="switchTab('materials', this)">Materials</button>
+    <button class="wh-tab-btn" onclick="switchTab('layout', this)">Layout</button>
+    <button class="wh-tab-btn" onclick="switchTab('movements', this)">Movements</button>
+</div>
 
-        <form class="form-block" method="post">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="create_bin">
-            <h4>Create Bin Hierarchy</h4>
-            <p>Define all 5 levels: Zone, Aisle, Rack, Shelf, and Bin.</p>
-            {% for field in bin_form %}
-            <div class="field">
-                <label>{{ field.label }}</label>
-                {{ field }}
-                {% for err in field.errors %}<div style="color:var(--bad); font-size:0.82rem;">{{ err }}</div>{% endfor %}
-            </div>
-            {% endfor %}
-            <button type="submit" class="btn btn-primary">Save Bin</button>
-        </form>
+<!-- ══════════════════════════════════
+     TAB 1 — OVERVIEW
+     ══════════════════════════════════ -->
+<div id="tab-overview" class="wh-tab-panel active">
 
-        <form class="form-block" method="post">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="link_project">
-            <h4>Link Project / Site</h4>
-            <p>Select from existing projects and map a site store to this warehouse.</p>
-            {% for field in link_form %}
-            <div class="field">
-                <label>{{ field.label }}</label>
-                {{ field }}
-                {% for err in field.errors %}<div style="color:var(--bad); font-size:0.82rem;">{{ err }}</div>{% endfor %}
-            </div>
-            {% endfor %}
-            <button type="submit" class="btn btn-primary">Link Project</button>
-        </form>
-    </div>
-</section>
+    <section class="panel panel-pad" style="margin-bottom: 12px;">
+        <h3 style="margin-top: 0;">Manage Warehouse Setup In One Place</h3>
+        <div class="form-grid">
+            <form class="form-block" method="post">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="create_store">
+                <h4>Create Store In This Warehouse</h4>
+                <p>Create HQ/Site store directly here and attach it to {{ warehouse.name }}.</p>
+                {% for field in store_form %}
+                <div class="field">
+                    <label>{{ field.label }}</label>
+                    {{ field }}
+                    {% for err in field.errors %}<div style="color:var(--bad); font-size:0.82rem;">{{ err }}</div>{% endfor %}
+                </div>
+                {% endfor %}
+                <button type="submit" class="btn btn-primary">Save Store</button>
+            </form>
 
-<section class="panel panel-pad table-wrap" style="margin-bottom: 12px;">
-    <h3 style="margin-top: 0;">Store Locations In {{ warehouse.name }}</h3>
-    <table>
-        <thead><tr><th>Store</th><th>Type</th><th>Project</th><th>Status</th><th>Actions</th></tr></thead>
-        <tbody>
-            {% for item in store_rows %}
-            <tr>
-                <td>{{ item.name }}</td>
-                <td>{{ item.get_location_type_display }}</td>
-                <td>{{ item.project.name|default:'-' }}</td>
-                <td>{% if item.is_active %}<span class="badge badge-ok">Active</span>{% else %}<span class="badge badge-neutral">Inactive</span>{% endif %}</td>
-                <td>
-                    <a class="btn btn-neutral btn-sm" href="{% url 'record_update' 'store-locations' item.id %}">Edit</a>
-                    <a class="btn btn-primary btn-sm" href="{% url 'goods_received_create' %}?store={{ item.id }}">Stock In</a>
-                </td>
-            </tr>
+            <form class="form-block" method="post">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="create_bin">
+                <h4>Create Bin Hierarchy</h4>
+                <p>Define all 5 levels: Zone, Aisle, Rack, Shelf, and Bin.</p>
+                {% for field in bin_form %}
+                <div class="field">
+                    <label>{{ field.label }}</label>
+                    {{ field }}
+                    {% for err in field.errors %}<div style="color:var(--bad); font-size:0.82rem;">{{ err }}</div>{% endfor %}
+                </div>
+                {% endfor %}
+                <button type="submit" class="btn btn-primary">Save Bin</button>
+            </form>
+
+            <form class="form-block" method="post">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="link_project">
+                <h4>Link Project / Site</h4>
+                <p>Select from existing projects and map a site store to this warehouse.</p>
+                {% for field in link_form %}
+                <div class="field">
+                    <label>{{ field.label }}</label>
+                    {{ field }}
+                    {% for err in field.errors %}<div style="color:var(--bad); font-size:0.82rem;">{{ err }}</div>{% endfor %}
+                </div>
+                {% endfor %}
+                <button type="submit" class="btn btn-primary">Link Project</button>
+            </form>
+        </div>
+    </section>
+
+    <section class="panel panel-pad table-wrap" style="margin-bottom: 12px;">
+        <h3 style="margin-top: 0;">Store Locations In {{ warehouse.name }}</h3>
+        <table>
+            <thead><tr><th>Store</th><th>Type</th><th>Project</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody>
+                {% for item in store_rows %}
+                <tr>
+                    <td>{{ item.name }}</td>
+                    <td>{{ item.get_location_type_display }}</td>
+                    <td>{{ item.project.name|default:'-' }}</td>
+                    <td>{% if item.is_active %}<span class="badge badge-ok">Active</span>{% else %}<span class="badge badge-neutral">Inactive</span>{% endif %}</td>
+                    <td>
+                        <a class="btn btn-neutral btn-sm" href="{% url 'record_update' 'store-locations' item.id %}">Edit</a>
+                        <a class="btn btn-primary btn-sm" href="{% url 'goods_received_create' %}?store={{ item.id }}">Stock In</a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="5">No stores linked to this warehouse yet.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+
+    <section class="panel panel-pad table-wrap" style="margin-bottom: 12px;">
+        <h3 style="margin-top: 0;">Warehouse Bin Hierarchy</h3>
+        <table>
+            <thead><tr><th>Store</th><th>Zone</th><th>Aisle</th><th>Rack</th><th>Shelf</th><th>Bin</th><th>Status</th></tr></thead>
+            <tbody>
+                {% for item in bin_rows %}
+                <tr>
+                    <td>{{ item.store_location.name }}</td>
+                    <td>{{ item.zone|default:'-' }}</td>
+                    <td>{{ item.aisle|default:'-' }}</td>
+                    <td>{{ item.rack|default:'-' }}</td>
+                    <td>{{ item.shelf|default:'-' }}</td>
+                    <td>{{ item.bin_code }}</td>
+                    <td>{% if item.is_active %}<span class="badge badge-ok">Active</span>{% else %}<span class="badge badge-neutral">Inactive</span>{% endif %}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="7">No bins available for this warehouse.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+
+    <section class="panel panel-pad" style="margin-bottom: 12px;">
+        <h3 style="margin-top: 0;">Projects / Sites Served By This Warehouse</h3>
+        <div class="project-grid">
+            {% for card in project_cards %}
+            <a class="project-card-link" href="{% url 'project_manage' card.project.id %}">
+                <h4 class="project-title">{{ card.project.name }}</h4>
+                <div style="color:var(--muted); font-size:0.88rem;">Click to open project/site page</div>
+                <div class="project-stats">
+                    <div class="project-stat"><strong>Sent Qty</strong><div>{{ card.sent_qty }}</div></div>
+                    <div class="project-stat"><strong>Received Qty</strong><div>{{ card.received_qty }}</div></div>
+                    <div class="project-stat"><strong>In Store Qty</strong><div>{{ card.in_store_qty }}</div></div>
+                    <div class="project-stat"><strong>Pending Req.</strong><div>{{ card.pending_requisitions }}</div></div>
+                    <div class="project-stat"><strong>Returned Qty</strong><div>{{ card.returned_goods_qty }}</div></div>
+                </div>
+            </a>
             {% empty %}
-            <tr><td colspan="5">No stores linked to this warehouse yet.</td></tr>
+            <div class="panel panel-pad">No linked projects/sites yet.</div>
             {% endfor %}
-        </tbody>
-    </table>
-</section>
+        </div>
+    </section>
 
-<section class="panel panel-pad table-wrap" style="margin-bottom: 12px;">
-    <h3 style="margin-top: 0;">Warehouse Bin Hierarchy</h3>
-    <table>
-        <thead><tr><th>Store</th><th>Zone</th><th>Aisle</th><th>Rack</th><th>Shelf</th><th>Bin</th><th>Status</th></tr></thead>
-        <tbody>
-            {% for item in bin_rows %}
-            <tr>
-                <td>{{ item.store_location.name }}</td>
-                <td>{{ item.zone|default:'-' }}</td>
-                <td>{{ item.aisle|default:'-' }}</td>
-                <td>{{ item.rack|default:'-' }}</td>
-                <td>{{ item.shelf|default:'-' }}</td>
-                <td>{{ item.bin_code }}</td>
-                <td>{% if item.is_active %}<span class="badge badge-ok">Active</span>{% else %}<span class="badge badge-neutral">Inactive</span>{% endif %}</td>
-            </tr>
-            {% empty %}
-            <tr><td colspan="7">No bins available for this warehouse.</td></tr>
-            {% endfor %}
-        </tbody>
-    </table>
-</section>
+</div><!-- /tab-overview -->
 
-<section class="panel panel-pad table-wrap" style="margin-bottom: 12px;">
-    <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:10px;">
-        <h3 style="margin: 0;">Current Stock Balance</h3>
-        <input type="search" id="balanceSearch" placeholder="Filter material, store, bin…"
-            style="padding:6px 10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--text); font-size:0.88rem; width:220px;"
-            oninput="filterBalanceTable(this.value)">
-    </div>
-    <table id="balanceTable">
-        <thead>
-            <tr>
-                <th>Material</th>
-                <th>Code</th>
-                <th>Store</th>
-                <th>Bin</th>
-                <th>On Hand</th>
-                <th>Reserved</th>
-                <th>Available</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for row in balance_rows %}
-            <tr>
-                <td>{{ row.material.name }}</td>
-                <td>{{ row.material.code_number }}</td>
-                <td>{{ row.storage_bin.store_location.name }}</td>
-                <td>{{ row.storage_bin.bin_code }}</td>
-                <td>{{ row.on_hand }}</td>
-                <td>{{ row.reserved }}</td>
-                <td>{{ row.available }}</td>
-            </tr>
-            {% empty %}
-            <tr><td colspan="7" style="color:var(--muted);">No stock recorded in this warehouse yet.</td></tr>
+<!-- ══════════════════════════════════
+     TAB 2 — MATERIALS
+     ══════════════════════════════════ -->
+<div id="tab-materials" class="wh-tab-panel">
+    <section class="panel panel-pad table-wrap" style="margin-bottom: 12px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:10px;">
+            <h3 style="margin: 0;">Materials In {{ warehouse.name }}</h3>
+            <input type="search" id="matSearch" placeholder="Search material name or code…"
+                style="padding:6px 10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--text); font-size:0.88rem; width:240px;"
+                oninput="filterTable('matTable', this.value)">
+        </div>
+        <table id="matTable">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Material</th>
+                    <th>Code</th>
+                    <th>On Hand</th>
+                    <th>Reserved</th>
+                    <th>Available</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for m in materials_summary %}
+                <tr>
+                    <td style="color:var(--muted); font-size:0.82rem;">{{ forloop.counter }}</td>
+                    <td>{{ m.material__name }}</td>
+                    <td style="font-size:0.85rem; color:var(--muted);">{{ m.material__code_number }}</td>
+                    <td>{{ m.total_on_hand }}</td>
+                    <td>{{ m.total_reserved }}</td>
+                    <td>
+                        {% if m.available > 0 %}
+                            <span style="color:var(--ok, #22c55e);">{{ m.available }}</span>
+                        {% else %}
+                            <span style="color:var(--bad);">{{ m.available }}</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="6" style="color:var(--muted);">No materials in stock for this warehouse yet.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <p style="color:var(--muted); font-size:0.83rem; margin-top:8px;">{{ materials_summary|length }} material line(s) in this warehouse.</p>
+    </section>
+</div><!-- /tab-materials -->
+
+<!-- ══════════════════════════════════
+     TAB 3 — LAYOUT
+     ══════════════════════════════════ -->
+<div id="tab-layout" class="wh-tab-panel">
+    <section class="panel panel-pad" style="margin-bottom: 12px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:14px;">
+            <h3 style="margin:0;">Warehouse Layout — {{ warehouse.name }}</h3>
+            {% if layout_zones %}
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                <label style="font-size:0.85rem; color:var(--muted);">Jump to zone:</label>
+                <select id="zoneJump" onchange="jumpToZone(this.value)"
+                    style="padding:5px 10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--text); font-size:0.88rem;">
+                    <option value="">— All Zones —</option>
+                    {% for z in layout_zones %}<option value="zone-{{ z|slugify }}">{{ z }}</option>{% endfor %}
+                </select>
+                <button class="btn btn-neutral btn-sm" onclick="expandAll()">Expand All</button>
+                <button class="btn btn-neutral btn-sm" onclick="collapseAll()">Collapse All</button>
+            </div>
+            {% endif %}
+        </div>
+
+        {% if layout_data %}
+        <div id="layoutAccordion">
+            {% for zone in layout_data %}
+            <details class="acc-zone" id="zone-{{ zone.zone|slugify }}">
+                <summary>
+                    <span>📦 Zone: {{ zone.zone }}</span>
+                    <span class="acc-arrow">▶</span>
+                </summary>
+                <div class="acc-zone-body">
+                    {% for aisle_obj in zone.aisles %}
+                    <details class="acc-aisle">
+                        <summary>
+                            <span>🛤 Aisle: {{ aisle_obj.aisle }}</span>
+                            <span class="acc-arrow">▶</span>
+                        </summary>
+                        <div class="acc-aisle-body">
+                            {% for rack_obj in aisle_obj.racks %}
+                            <details class="acc-rack">
+                                <summary>
+                                    <span>🗄 Rack: {{ rack_obj.rack }}</span>
+                                    <span class="acc-arrow">▶</span>
+                                </summary>
+                                <div class="acc-rack-body">
+                                    {% for shelf_obj in rack_obj.shelves %}
+                                    <details class="acc-shelf">
+                                        <summary>
+                                            <span>📂 Shelf: {{ shelf_obj.shelf }}</span>
+                                            <span class="acc-arrow">▶</span>
+                                        </summary>
+                                        <div class="acc-shelf-body">
+                                            {% for bin in shelf_obj.bins %}
+                                            <div style="margin-bottom:6px;">
+                                                <div style="font-size:0.78rem; font-weight:700; color:var(--brand); margin-bottom:4px;">
+                                                    🗂 Bin: {{ bin.bin_code }}
+                                                </div>
+                                                {% for item in bin.items %}
+                                                <div class="bin-row">
+                                                    <span class="bin-material">{{ item.material_name }}</span>
+                                                    <span style="font-size:0.78rem; color:var(--muted);">{{ item.material_code }}</span>
+                                                    <span class="bin-qty">On Hand: <strong>{{ item.on_hand }}</strong></span>
+                                                    <span class="bin-qty">Reserved: {{ item.reserved }}</span>
+                                                    <span class="bin-qty" style="color:{% if item.available > 0 %}var(--ok, #22c55e){% else %}var(--bad){% endif %};">
+                                                        Available: <strong>{{ item.available }}</strong>
+                                                    </span>
+                                                </div>
+                                                {% endfor %}
+                                            </div>
+                                            {% endfor %}
+                                        </div>
+                                    </details>
+                                    {% endfor %}
+                                </div>
+                            </details>
+                            {% endfor %}
+                        </div>
+                    </details>
+                    {% endfor %}
+                </div>
+            </details>
             {% endfor %}
-        </tbody>
-    </table>
-    {% if balance_rows|length == 300 %}
-    <p style="color:var(--muted); font-size:0.84rem; margin-top:8px;">Showing first 300 lines. Use filter to narrow results.</p>
-    {% endif %}
-</section>
+        </div>
+        {% else %}
+        <div style="color:var(--muted); padding: 24px 0; text-align:center;">No stock with bin locations found for this warehouse yet.</div>
+        {% endif %}
+    </section>
+</div><!-- /tab-layout -->
+
+<!-- ══════════════════════════════════
+     TAB 4 — MOVEMENTS
+     ══════════════════════════════════ -->
+<div id="tab-movements" class="wh-tab-panel">
+    <section class="panel panel-pad table-wrap" style="margin-bottom: 12px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:10px;">
+            <h3 style="margin: 0;">Recent Stock Movements</h3>
+            <input type="search" id="movSearch" placeholder="Filter material, type, store…"
+                style="padding:6px 10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--text); font-size:0.88rem; width:220px;"
+                oninput="filterTable('movTable', this.value)">
+        </div>
+        <table id="movTable">
+            <thead>
+                <tr>
+                    <th>Date / Time</th>
+                    <th>Type</th>
+                    <th>Material</th>
+                    <th>Qty</th>
+                    <th>From Store</th>
+                    <th>From Bin</th>
+                    <th>To Store</th>
+                    <th>To Bin</th>
+                    <th>Ref</th>
+                    <th>By</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for mov in recent_movements %}
+                <tr>
+                    <td style="white-space:nowrap;">{{ mov.created_at|date:"d M Y H:i" }}</td>
+                    <td>
+                        {% if mov.movement_type == "RECEIPT" %}<span class="badge badge-ok">Receipt</span>
+                        {% elif mov.movement_type == "ISSUE" %}<span class="badge badge-warn">Issue</span>
+                        {% elif mov.movement_type == "TRANSFER" %}<span class="badge badge-neutral">Transfer</span>
+                        {% elif mov.movement_type == "RETURN" %}<span class="badge" style="background:var(--brand);color:#fff;">Return</span>
+                        {% else %}<span class="badge badge-neutral">{{ mov.movement_type }}</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ mov.material.name }}</td>
+                    <td>{{ mov.quantity }}</td>
+                    <td>{{ mov.from_store.name|default:"—" }}</td>
+                    <td>{{ mov.from_bin.bin_code|default:"—" }}</td>
+                    <td>{{ mov.to_store.name|default:"—" }}</td>
+                    <td>{{ mov.to_bin.bin_code|default:"—" }}</td>
+                    <td style="font-size:0.82rem;color:var(--muted);">{{ mov.reference_number|default:"" }}</td>
+                    <td style="font-size:0.82rem;">{{ mov.created_by.get_full_name|default:mov.created_by.username|default:"—" }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="10" style="color:var(--muted);">No stock movements recorded for this warehouse yet.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% if recent_movements|length == 50 %}
+        <p style="color:var(--muted); font-size:0.84rem; margin-top:8px;">Showing the 50 most recent movements.</p>
+        {% endif %}
+    </section>
+</div><!-- /tab-movements -->
 
 <script>
-function filterBalanceTable(query) {
+function switchTab(name, btn) {
+    document.querySelectorAll('.wh-tab-panel').forEach(function(p){ p.classList.remove('active'); });
+    document.querySelectorAll('.wh-tab-btn').forEach(function(b){ b.classList.remove('active'); });
+    document.getElementById('tab-' + name).classList.add('active');
+    btn.classList.add('active');
+}
+
+function filterTable(tableId, query) {
     const q = query.toLowerCase();
-    document.querySelectorAll('#balanceTable tbody tr').forEach(function(row) {
+    document.querySelectorAll('#' + tableId + ' tbody tr').forEach(function(row) {
         row.style.display = (!q || row.textContent.toLowerCase().includes(q)) ? '' : 'none';
     });
 }
-function filterMovTable(query) {
-    const q = query.toLowerCase();
-    document.querySelectorAll('#movTable tbody tr').forEach(function(row) {
-        row.style.display = (!q || row.textContent.toLowerCase().includes(q)) ? '' : 'none';
-    });
+
+function jumpToZone(zoneId) {
+    if (!zoneId) return;
+    var el = document.getElementById(zoneId);
+    if (el) {
+        el.open = true;
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+}
+
+function expandAll() {
+    document.querySelectorAll('#layoutAccordion details').forEach(function(d){ d.open = true; });
+}
+
+function collapseAll() {
+    document.querySelectorAll('#layoutAccordion details').forEach(function(d){ d.open = false; });
 }
 </script>
-
-<section class="panel panel-pad table-wrap" style="margin-bottom: 12px;">
-    <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:10px;">
-        <h3 style="margin: 0;">Recent Stock Movements</h3>
-        <input type="search" id="movSearch" placeholder="Filter material, type, store…"
-            style="padding:6px 10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--text); font-size:0.88rem; width:220px;"
-            oninput="filterMovTable(this.value)">
-    </div>
-    <table id="movTable">
-        <thead>
-            <tr>
-                <th>Date / Time</th>
-                <th>Type</th>
-                <th>Material</th>
-                <th>Qty</th>
-                <th>From Store</th>
-                <th>From Bin</th>
-                <th>To Store</th>
-                <th>To Bin</th>
-                <th>Ref</th>
-                <th>By</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for mov in recent_movements %}
-            <tr>
-                <td style="white-space:nowrap;">{{ mov.created_at|date:"d M Y H:i" }}</td>
-                <td>
-                    {% if mov.movement_type == "RECEIPT" %}<span class="badge badge-ok">Receipt</span>
-                    {% elif mov.movement_type == "ISSUE" %}<span class="badge badge-warn">Issue</span>
-                    {% elif mov.movement_type == "TRANSFER" %}<span class="badge badge-neutral">Transfer</span>
-                    {% elif mov.movement_type == "RETURN" %}<span class="badge" style="background:var(--brand);color:#fff;">Return</span>
-                    {% else %}<span class="badge badge-neutral">{{ mov.movement_type }}</span>
-                    {% endif %}
-                </td>
-                <td>{{ mov.material.name }}</td>
-                <td>{{ mov.quantity }}</td>
-                <td>{{ mov.from_store.name|default:"—" }}</td>
-                <td>{{ mov.from_bin.bin_code|default:"—" }}</td>
-                <td>{{ mov.to_store.name|default:"—" }}</td>
-                <td>{{ mov.to_bin.bin_code|default:"—" }}</td>
-                <td style="font-size:0.82rem;color:var(--muted);">{{ mov.reference_number|default:"" }}</td>
-                <td style="font-size:0.82rem;">{{ mov.created_by.get_full_name|default:mov.created_by.username|default:"—" }}</td>
-            </tr>
-            {% empty %}
-            <tr><td colspan="10" style="color:var(--muted);">No stock movements recorded for this warehouse yet.</td></tr>
-            {% endfor %}
-        </tbody>
-    </table>
-    {% if recent_movements|length == 50 %}
-    <p style="color:var(--muted); font-size:0.84rem; margin-top:8px;">Showing the 50 most recent movements.</p>
-    {% endif %}
-</section>
-
-<section class="panel panel-pad" style="margin-bottom: 12px;">
-    <h3 style="margin-top: 0;">Projects / Sites Served By This Warehouse</h3>
-    <div class="project-grid">
-        {% for card in project_cards %}
-        <a class="project-card-link" href="{% url 'project_manage' card.project.id %}">
-            <h4 class="project-title">{{ card.project.name }}</h4>
-            <div style="color:var(--muted); font-size:0.88rem;">Click to open project/site page</div>
-
-            <div class="project-stats">
-                <div class="project-stat"><strong>Sent Qty</strong><div>{{ card.sent_qty }}</div></div>
-                <div class="project-stat"><strong>Received Qty</strong><div>{{ card.received_qty }}</div></div>
-                <div class="project-stat"><strong>In Store Qty</strong><div>{{ card.in_store_qty }}</div></div>
-                <div class="project-stat"><strong>Pending Req.</strong><div>{{ card.pending_requisitions }}</div></div>
-                <div class="project-stat"><strong>Returned Qty</strong><div>{{ card.returned_goods_qty }}</div></div>
-            </div>
-        </a>
-        {% empty %}
-        <div class="panel panel-pad">No linked projects/sites yet.</div>
-        {% endfor %}
-    </div>
-</section>
 {% endblock %}

@@ -1371,23 +1371,79 @@ def warehouse_manage_view(request, pk):
                 messages.success(request, "Project/site linked to this warehouse successfully.")
                 return redirect("warehouse_manage", pk=warehouse.pk)
 
+    # Materials summary — aggregate per material across all bins in this warehouse
+    materials_summary = list(
+        balances_qs.filter(on_hand__gt=0)
+        .values("material__id", "material__name", "material__code_number")
+        .annotate(
+            total_on_hand=Sum("on_hand"),
+            total_reserved=Sum("reserved"),
+        )
+        .order_by("material__name")
+    )
+    for m in materials_summary:
+        m["available"] = m["total_on_hand"] - m["total_reserved"]
+
+    # Layout data — hierarchical Zone → Aisle → Rack → Shelf → Bin structure
+    _tree = {}
+    for b in balances_qs.filter(on_hand__gt=0).select_related(
+        "material", "storage_bin", "storage_bin__store_location"
+    )[:500]:
+        zone = b.storage_bin.zone or "Unassigned"
+        aisle = b.storage_bin.aisle or "Unassigned"
+        rack = b.storage_bin.rack or "Unassigned"
+        shelf = b.storage_bin.shelf or "Unassigned"
+        bin_code = b.storage_bin.bin_code
+        _tree.setdefault(zone, {}).setdefault(aisle, {}).setdefault(rack, {}).setdefault(shelf, {}).setdefault(bin_code, []).append(
+            {
+                "material_name": b.material.name,
+                "material_code": b.material.code_number,
+                "on_hand": b.on_hand,
+                "reserved": b.reserved,
+                "available": b.on_hand - b.reserved,
+            }
+        )
+
+    layout_data = []
+    for zone in sorted(_tree):
+        zone_obj = {"zone": zone, "aisles": []}
+        for aisle in sorted(_tree[zone]):
+            aisle_obj = {"aisle": aisle, "racks": []}
+            for rack in sorted(_tree[zone][aisle]):
+                rack_obj = {"rack": rack, "shelves": []}
+                for shelf in sorted(_tree[zone][aisle][rack]):
+                    shelf_obj = {"shelf": shelf, "bins": []}
+                    for bin_code in sorted(_tree[zone][aisle][rack][shelf]):
+                        shelf_obj["bins"].append(
+                            {"bin_code": bin_code, "items": _tree[zone][aisle][rack][shelf][bin_code]}
+                        )
+                    rack_obj["shelves"].append(shelf_obj)
+                aisle_obj["racks"].append(rack_obj)
+            zone_obj["aisles"].append(aisle_obj)
+        layout_data.append(zone_obj)
+
+    balance_rows = [
+        {
+            "material": b.material,
+            "storage_bin": b.storage_bin,
+            "on_hand": b.on_hand,
+            "reserved": b.reserved,
+            "available": b.on_hand - b.reserved,
+        }
+        for b in balances_qs.filter(on_hand__gt=0).select_related(
+            "material", "storage_bin", "storage_bin__store_location"
+        )[:300]
+    ]
+
     context.update(
         {
             "warehouse": warehouse,
             "store_rows": list(stores_qs),
             "bin_rows": list(bins_qs[:300]),
-            "balance_rows": [
-                {
-                    "material": b.material,
-                    "storage_bin": b.storage_bin,
-                    "on_hand": b.on_hand,
-                    "reserved": b.reserved,
-                    "available": b.on_hand - b.reserved,
-                }
-                for b in balances_qs.filter(on_hand__gt=0).select_related(
-                    "material", "storage_bin", "storage_bin__store_location"
-                )[:300]
-            ],
+            "balance_rows": balance_rows,
+            "materials_summary": materials_summary,
+            "layout_data": layout_data,
+            "layout_zones": [z["zone"] for z in layout_data],
             "project_cards": project_cards,
             "store_form": store_form,
             "bin_form": bin_form,
