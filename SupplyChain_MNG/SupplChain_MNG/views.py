@@ -1434,12 +1434,19 @@ def warehouse_manage_view(request, pk):
         shelf_key = b.storage_bin.shelf or ""
         bin_code = b.storage_bin.bin_code
         item = {
-            "material_name": b.material.name,
-            "material_code": b.material.code_number,
-            "on_hand": b.on_hand,
-            "reserved": b.reserved,
-            "available": b.on_hand - b.reserved,
-        }
+                "balance_id": b.pk,
+                "material_name": b.material.name,
+                "material_code": b.material.code_number,
+                "on_hand": b.on_hand,
+                "reserved": b.reserved,
+                "available": b.on_hand - b.reserved,
+                "min_required": b.min_required,
+                "status": (
+                    "out_of_stock" if b.on_hand <= 0
+                    else "low_stock" if b.min_required > 0 and b.on_hand <= b.min_required
+                    else "in_stock"
+                ),
+            }
         if zone_key not in _tree:
             _tree[zone_key] = {"__bins__": {}, "aisles": {}}
         if not aisle_key:
@@ -1632,10 +1639,113 @@ def warehouse_quick_create_bin(request, pk):
 
 
 @login_required
+def warehouse_balance_detail(request, pk, balance_id):
+    """AJAX: return full detail for a single InventoryBalance (material card + stock)."""
+    warehouse = get_object_or_404(Warehouse, pk=pk)
+    balance = get_object_or_404(
+        InventoryBalance.objects.select_related(
+            "material", "material__category",
+            "storage_bin", "storage_bin__store_location",
+        ),
+        pk=balance_id,
+        storage_bin__store_location__warehouse=warehouse,
+    )
+    mat = balance.material
+    sbin = balance.storage_bin
+    # Build breadcrumb parts
+    breadcrumb = []
+    if sbin.store_location:
+        breadcrumb.append({"label": "Store", "value": sbin.store_location.name})
+    if sbin.zone:
+        breadcrumb.append({"label": "Zone", "value": sbin.zone})
+    if sbin.aisle:
+        breadcrumb.append({"label": "Aisle", "value": sbin.aisle})
+    if sbin.rack:
+        breadcrumb.append({"label": "Rack", "value": sbin.rack})
+    if sbin.shelf:
+        breadcrumb.append({"label": "Shelf", "value": sbin.shelf})
+    breadcrumb.append({"label": "Bin", "value": sbin.bin_code})
+
+    photo_url = mat.photo.url if mat.photo else None
+    status = "in_stock"
+    if balance.on_hand <= 0:
+        status = "out_of_stock"
+    elif balance.min_required > 0 and balance.on_hand <= balance.min_required:
+        status = "low_stock"
+
+    return JsonResponse({
+        "balance_id": balance.pk,
+        "material_id": mat.pk,
+        "material_name": mat.name,
+        "material_code": mat.code_number,
+        "category": mat.category.name if mat.category else "",
+        "unit": mat.unit,
+        "measurement_unit": mat.get_measurement_unit_display(),
+        "is_consumable": mat.is_consumable,
+        "photo_url": photo_url,
+        "on_hand": str(balance.on_hand),
+        "reserved": str(balance.reserved),
+        "available": str(balance.on_hand - balance.reserved),
+        "min_required": str(balance.min_required),
+        "status": status,
+        "breadcrumb": breadcrumb,
+        "material_edit_url": f"/workspace/materials/{mat.pk}/",
+    })
+
+
+@login_required
+def warehouse_balance_update(request, pk, balance_id):
+    """AJAX POST: update on_hand and/or min_required for a balance record."""
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    _enforce_manage_access(request.user, "warehouse")
+    warehouse = get_object_or_404(Warehouse, pk=pk)
+    balance = get_object_or_404(
+        InventoryBalance,
+        pk=balance_id,
+        storage_bin__store_location__warehouse=warehouse,
+    )
+    errors = {}
+    try:
+        new_on_hand = Decimal(request.POST.get("on_hand", str(balance.on_hand)))
+        if new_on_hand < 0:
+            errors["on_hand"] = "Cannot be negative."
+    except Exception:
+        errors["on_hand"] = "Invalid number."
+    try:
+        new_min = Decimal(request.POST.get("min_required", str(balance.min_required)))
+        if new_min < 0:
+            errors["min_required"] = "Cannot be negative."
+    except Exception:
+        errors["min_required"] = "Invalid number."
+    if errors:
+        return JsonResponse({"error": errors}, status=400)
+
+    balance.on_hand = new_on_hand
+    balance.min_required = new_min
+    balance.save(update_fields=["on_hand", "min_required", "updated_at"])
+
+    status = "in_stock"
+    if balance.on_hand <= 0:
+        status = "out_of_stock"
+    elif balance.min_required > 0 and balance.on_hand <= balance.min_required:
+        status = "low_stock"
+
+    return JsonResponse({
+        "on_hand": str(balance.on_hand),
+        "reserved": str(balance.reserved),
+        "available": str(balance.on_hand - balance.reserved),
+        "min_required": str(balance.min_required),
+        "status": status,
+    })
+
+
+@login_required
 def material_returns_view(request):
     context = _base_context(request, "returns")
     context["rows"] = context["returns"].order_by("-date_returned")
     return render(request, "SupplChain_MNG/material_returns.html", context)
+
 
 
 @login_required

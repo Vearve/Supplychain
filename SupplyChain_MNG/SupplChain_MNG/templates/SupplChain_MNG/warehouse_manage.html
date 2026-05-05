@@ -4,6 +4,7 @@
 {% block page_title %}Warehouse: {{ warehouse.name }}{% endblock %}
 
 {% block content %}
+<span id="wh-config" data-pk="{{ warehouse.pk }}" hidden></span>
 <style>
     .project-grid {
         display: grid;
@@ -128,6 +129,9 @@
     }
     .bin-label { font-weight: 600; color: var(--brand); min-width: 80px; }
     .bin-material { flex: 1; }
+    .qty-pos { color: var(--ok, #22c55e); }
+    .qty-zero { color: var(--muted); }
+    .qty-neg { color: var(--bad, #ef4444); }
     .bin-qty { color: var(--muted); white-space: nowrap; }
     .acc-arrow { font-size: 0.8rem; transition: transform 0.2s; margin-left: auto; margin-right: 4px; }
     details[open] > summary .acc-arrow { transform: rotate(90deg); }
@@ -392,12 +396,14 @@
                     <div style="margin-bottom:6px;">
                         <div style="font-size:0.78rem; font-weight:700; color:var(--brand); margin-bottom:4px;">🗂 Bin: {{ bin.bin_code }}</div>
                         {% for item in bin.items %}
-                        <div class="bin-row">
+                        <div class="bin-row bin-row-click" data-balance-id="{{ item.balance_id }}">
                             <span class="bin-material">{{ item.material_name }}</span>
                             <span style="font-size:0.78rem; color:var(--muted);">{{ item.material_code }}</span>
                             <span class="bin-qty">On Hand: <strong>{{ item.on_hand }}</strong></span>
-                            <span class="bin-qty">Reserved: {{ item.reserved }}</span>
-                            <span class="bin-qty" style="color:{% if item.available > 0 %}var(--ok, #22c55e){% else %}var(--bad){% endif %};">Available: <strong>{{ item.available }}</strong></span>
+                            <span class="bin-qty">Avail: <strong class="{% if item.available > 0 %}qty-pos{% elif item.available == 0 %}qty-zero{% else %}qty-neg{% endif %}">{{ item.available }}</strong></span>
+                            {% if item.status == 'low_stock' %}<span class="badge badge-warn" style="font-size:0.7rem;padding:2px 6px;">Low</span>{% endif %}
+                            {% if item.status == 'out_of_stock' %}<span class="badge" style="background:var(--bad);color:#fff;font-size:0.7rem;padding:2px 6px;">Out</span>{% endif %}
+                            <span style="margin-left:auto;color:var(--muted);font-size:0.85rem;">›</span>
                         </div>
                         {% endfor %}
                     </div>
@@ -417,12 +423,14 @@
                             <div style="margin-bottom:6px;">
                                 <div style="font-size:0.78rem; font-weight:700; color:var(--brand); margin-bottom:4px;">🗂 Bin: {{ bin.bin_code }}</div>
                                 {% for item in bin.items %}
-                                <div class="bin-row">
+                                <div class="bin-row bin-row-click" data-balance-id="{{ item.balance_id }}">
                                     <span class="bin-material">{{ item.material_name }}</span>
                                     <span style="font-size:0.78rem; color:var(--muted);">{{ item.material_code }}</span>
                                     <span class="bin-qty">On Hand: <strong>{{ item.on_hand }}</strong></span>
-                                    <span class="bin-qty">Reserved: {{ item.reserved }}</span>
-                                    <span class="bin-qty" style="color:{% if item.available > 0 %}var(--ok, #22c55e){% else %}var(--bad){% endif %};">Available: <strong>{{ item.available }}</strong></span>
+                                    <span class="bin-qty">Avail: <strong class="{% if item.available > 0 %}qty-pos{% elif item.available == 0 %}qty-zero{% else %}qty-neg{% endif %}">{{ item.available }}</strong></span>
+                                    {% if item.status == 'low_stock' %}<span class="badge badge-warn" style="font-size:0.7rem;padding:2px 6px;">Low</span>{% endif %}
+                                    {% if item.status == 'out_of_stock' %}<span class="badge" style="background:var(--bad);color:#fff;font-size:0.7rem;padding:2px 6px;">Out</span>{% endif %}
+                                    <span style="margin-left:auto;color:var(--muted);font-size:0.85rem;">›</span>
                                 </div>
                                 {% endfor %}
                             </div>
@@ -441,12 +449,14 @@
                                     <div style="margin-bottom:6px;">
                                         <div style="font-size:0.78rem; font-weight:700; color:var(--brand); margin-bottom:4px;">🗂 Bin: {{ bin.bin_code }}</div>
                                         {% for item in bin.items %}
-                                        <div class="bin-row">
+                                        <div class="bin-row bin-row-click" data-balance-id="{{ item.balance_id }}">
                                             <span class="bin-material">{{ item.material_name }}</span>
                                             <span style="font-size:0.78rem; color:var(--muted);">{{ item.material_code }}</span>
                                             <span class="bin-qty">On Hand: <strong>{{ item.on_hand }}</strong></span>
-                                            <span class="bin-qty">Reserved: {{ item.reserved }}</span>
-                                            <span class="bin-qty" style="color:{% if item.available > 0 %}var(--ok, #22c55e){% else %}var(--bad){% endif %};">Available: <strong>{{ item.available }}</strong></span>
+                                            <span class="bin-qty">Avail: <strong class="{% if item.available > 0 %}qty-pos{% elif item.available == 0 %}qty-zero{% else %}qty-neg{% endif %}">{{ item.available }}</strong></span>
+                                            {% if item.status == 'low_stock' %}<span class="badge badge-warn" style="font-size:0.7rem;padding:2px 6px;">Low</span>{% endif %}
+                                            {% if item.status == 'out_of_stock' %}<span class="badge" style="background:var(--bad);color:#fff;font-size:0.7rem;padding:2px 6px;">Out</span>{% endif %}
+                                            <span style="margin-left:auto;color:var(--muted);font-size:0.85rem;">›</span>
                                         </div>
                                         {% endfor %}
                                     </div>
@@ -463,12 +473,14 @@
                                             <div style="margin-bottom:6px;">
                                                 <div style="font-size:0.78rem; font-weight:700; color:var(--brand); margin-bottom:4px;">🗂 Bin: {{ bin.bin_code }}</div>
                                                 {% for item in bin.items %}
-                                                <div class="bin-row">
+                                                <div class="bin-row bin-row-click" data-balance-id="{{ item.balance_id }}">
                                                     <span class="bin-material">{{ item.material_name }}</span>
                                                     <span style="font-size:0.78rem; color:var(--muted);">{{ item.material_code }}</span>
                                                     <span class="bin-qty">On Hand: <strong>{{ item.on_hand }}</strong></span>
-                                                    <span class="bin-qty">Reserved: {{ item.reserved }}</span>
-                                                    <span class="bin-qty" style="color:{% if item.available > 0 %}var(--ok, #22c55e){% else %}var(--bad){% endif %};">Available: <strong>{{ item.available }}</strong></span>
+                                                    <span class="bin-qty">Avail: <strong class="{% if item.available > 0 %}qty-pos{% elif item.available == 0 %}qty-zero{% else %}qty-neg{% endif %}">{{ item.available }}</strong></span>
+                                                    {% if item.status == 'low_stock' %}<span class="badge badge-warn" style="font-size:0.7rem;padding:2px 6px;">Low</span>{% endif %}
+                                                    {% if item.status == 'out_of_stock' %}<span class="badge" style="background:var(--bad);color:#fff;font-size:0.7rem;padding:2px 6px;">Out</span>{% endif %}
+                                                    <span style="margin-left:auto;color:var(--muted);font-size:0.85rem;">›</span>
                                                 </div>
                                                 {% endfor %}
                                             </div>
@@ -494,6 +506,70 @@
         {% endif %}
     </section>
 </div><!-- /tab-layout -->
+
+<!-- ── Material Balance Detail Drawer ──────────────────────────────────── -->
+<div id="bdOverlay" onclick="closeBalanceDrawer()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.3);z-index:8000;"></div>
+<div id="bdDrawer" style="display:none;position:fixed;top:0;right:0;bottom:0;width:380px;max-width:96vw;background:var(--card);border-left:1px solid var(--line);z-index:8001;overflow-y:auto;box-shadow:-4px 0 24px rgba(0,0,0,0.18);flex-direction:column;">
+    <div style="padding:16px 18px 12px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:flex-start;flex-shrink:0;">
+        <div style="flex:1;min-width:0;">
+            <div id="bdBreadcrumb" style="font-size:0.73rem;color:var(--muted);margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
+            <h3 id="bdName" style="margin:0;font-size:1.05rem;"></h3>
+            <div id="bdCode" style="font-size:0.82rem;color:var(--muted);"></div>
+        </div>
+        <button onclick="closeBalanceDrawer()" style="background:none;border:none;font-size:1.3rem;cursor:pointer;color:var(--muted);padding:0;margin-left:8px;flex-shrink:0;">✕</button>
+    </div>
+    <div style="padding:16px 18px;flex:1;">
+        <div id="bdLoading" style="text-align:center;color:var(--muted);padding:40px 0;">Loading…</div>
+        <div id="bdContent" style="display:none;">
+            <div style="display:flex;gap:14px;align-items:flex-start;margin-bottom:16px;">
+                <div id="bdPhoto" style="width:72px;height:72px;border-radius:10px;background:var(--bg);border:1px solid var(--line);overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center;"><span style="font-size:2rem;">📦</span></div>
+                <div>
+                    <div id="bdCat" style="font-size:0.82rem;color:var(--muted);"></div>
+                    <div id="bdUnit" style="font-size:0.82rem;color:var(--muted);"></div>
+                    <div id="bdStatus" style="margin-top:6px;"></div>
+                </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px;">
+                <div style="background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:12px;text-align:center;">
+                    <div style="font-size:0.73rem;color:var(--muted);margin-bottom:2px;">On Hand</div>
+                    <div id="bdOnHand" style="font-size:1.4rem;font-weight:700;"></div>
+                </div>
+                <div style="background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:12px;text-align:center;">
+                    <div style="font-size:0.73rem;color:var(--muted);margin-bottom:2px;">Available</div>
+                    <div id="bdAvail" style="font-size:1.4rem;font-weight:700;"></div>
+                </div>
+                <div style="background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:12px;text-align:center;">
+                    <div style="font-size:0.73rem;color:var(--muted);margin-bottom:2px;">Reserved</div>
+                    <div id="bdReserved" style="font-size:1.1rem;font-weight:600;"></div>
+                </div>
+                <div style="background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:12px;text-align:center;">
+                    <div style="font-size:0.73rem;color:var(--muted);margin-bottom:2px;">Min Required</div>
+                    <div id="bdMinReq" style="font-size:1.1rem;font-weight:600;"></div>
+                </div>
+            </div>
+            <div style="background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:14px;">
+                <div style="font-size:0.85rem;font-weight:600;margin-bottom:10px;">Adjust Stock / Threshold</div>
+                <div id="bdEditErr" style="display:none;color:var(--bad);font-size:0.82rem;margin-bottom:8px;padding:6px 8px;border:1px solid var(--bad);border-radius:6px;"></div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+                    <div>
+                        <label style="display:block;font-size:0.78rem;color:var(--muted);margin-bottom:3px;">On Hand</label>
+                        <input type="number" id="bdEditOnHand" min="0" step="0.01" style="width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:7px;background:var(--card);color:var(--text);font-size:0.9rem;box-sizing:border-box;">
+                    </div>
+                    <div>
+                        <label style="display:block;font-size:0.78rem;color:var(--muted);margin-bottom:3px;">Min Required</label>
+                        <input type="number" id="bdEditMinReq" min="0" step="0.01" style="width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:7px;background:var(--card);color:var(--text);font-size:0.9rem;box-sizing:border-box;">
+                    </div>
+                </div>
+                <button onclick="saveBalanceEdit()" id="bdSaveBtn" style="width:100%;padding:8px;background:var(--brand);color:#fff;border:none;border-radius:8px;font-size:0.9rem;font-weight:600;cursor:pointer;">Save Changes</button>
+            </div>
+            <a id="bdEditLink" href="#" target="_blank" style="display:block;text-align:center;padding:9px;border:1px solid var(--line);border-radius:8px;color:var(--brand);text-decoration:none;font-size:0.88rem;font-weight:600;">✏ Edit Material Details</a>
+        </div>
+    </div>
+</div>
+<style>
+.bin-row-click { cursor:pointer; }
+.bin-row-click:hover { background:rgba(var(--brand-rgb,59,130,246),0.07); border-radius:6px; }
+</style>
 
 <!-- ══════════════════════════════════
      TAB 4 — MOVEMENTS
@@ -671,9 +747,9 @@
 </div>
 
 <script>
-const STORES_BINS = {{ stores_bins_json|safe }};
-const ALL_MATERIALS = {{ all_materials_json|safe }};
-const WH_PK = {{ warehouse.pk }};
+const STORES_BINS = JSON.parse('{{ stores_bins_json|escapejs }}');
+const ALL_MATERIALS = JSON.parse('{{ all_materials_json|escapejs }}');
+const WH_PK = parseInt(document.getElementById('wh-config').dataset.pk, 10);
 
 // ── Material typeahead ──────────────────────────────────────────────────
 function filterMatList(q) {
@@ -1016,6 +1092,126 @@ function expandAll() {
 
 function collapseAll() {
     document.querySelectorAll('#layoutAccordion details').forEach(function(d){ d.open = false; });
+}
+
+// ── Balance detail drawer ───────────────────────────────────────────────
+var _bdBalanceId = null;
+
+// Event delegation: catch clicks on any .bin-row-click with a data-balance-id
+document.addEventListener('click', function(e) {
+    var row = e.target.closest('[data-balance-id]');
+    if (row) openBalanceDrawer(parseInt(row.dataset.balanceId, 10));
+});
+
+function openBalanceDrawer(balanceId) {
+    _bdBalanceId = balanceId;
+    document.getElementById('bdDrawer').style.display = 'flex';
+    document.getElementById('bdOverlay').style.display = 'block';
+    document.getElementById('bdLoading').style.display = 'block';
+    document.getElementById('bdContent').style.display = 'none';
+    fetch('/workspace/warehouse-management/' + WH_PK + '/balance/' + balanceId + '/detail/', {
+        headers: {'X-Requested-With': 'XMLHttpRequest'}
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(d) {
+        document.getElementById('bdLoading').style.display = 'none';
+        document.getElementById('bdContent').style.display = 'block';
+
+        // Breadcrumb
+        var bc = (d.breadcrumb || []).map(function(p){ return p.value; }).join(' › ');
+        document.getElementById('bdBreadcrumb').textContent = bc;
+        document.getElementById('bdName').textContent = d.material_name;
+        document.getElementById('bdCode').textContent = d.material_code;
+
+        // Photo
+        var photoEl = document.getElementById('bdPhoto');
+        if (d.photo_url) {
+            photoEl.innerHTML = '<img src="' + d.photo_url + '" style="width:100%;height:100%;object-fit:cover;">';
+        } else {
+            photoEl.innerHTML = '<span style="font-size:2rem;">📦</span>';
+        }
+
+        // Meta
+        document.getElementById('bdCat').textContent = d.category ? 'Category: ' + d.category : '';
+        document.getElementById('bdUnit').textContent = d.measurement_unit ? d.measurement_unit + ' · ' + d.unit : d.unit;
+
+        // Status badge
+        var statusMap = {
+            'in_stock':    '<span class="badge badge-ok">In Stock</span>',
+            'low_stock':   '<span class="badge badge-warn">Low Stock</span>',
+            'out_of_stock':'<span class="badge" style="background:var(--bad);color:#fff;">Out of Stock</span>',
+        };
+        document.getElementById('bdStatus').innerHTML = statusMap[d.status] || '';
+
+        // Figures
+        document.getElementById('bdOnHand').textContent = d.on_hand;
+        document.getElementById('bdAvail').textContent = d.available;
+        document.getElementById('bdReserved').textContent = d.reserved;
+        document.getElementById('bdMinReq').textContent = d.min_required;
+
+        // Edit inputs
+        document.getElementById('bdEditOnHand').value = d.on_hand;
+        document.getElementById('bdEditMinReq').value = d.min_required;
+        document.getElementById('bdEditErr').style.display = 'none';
+
+        // Edit link
+        document.getElementById('bdEditLink').href = d.material_edit_url;
+    })
+    .catch(function(e) {
+        document.getElementById('bdLoading').textContent = 'Failed to load. ' + e.message;
+    });
+}
+
+function closeBalanceDrawer() {
+    document.getElementById('bdDrawer').style.display = 'none';
+    document.getElementById('bdOverlay').style.display = 'none';
+    _bdBalanceId = null;
+}
+
+function saveBalanceEdit() {
+    if (!_bdBalanceId) return;
+    var btn = document.getElementById('bdSaveBtn');
+    var errDiv = document.getElementById('bdEditErr');
+    btn.disabled = true;
+    btn.textContent = 'Saving…';
+    errDiv.style.display = 'none';
+
+    var fd = new FormData();
+    fd.append('on_hand', document.getElementById('bdEditOnHand').value);
+    fd.append('min_required', document.getElementById('bdEditMinReq').value);
+    fd.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+
+    fetch('/workspace/warehouse-management/' + WH_PK + '/balance/' + _bdBalanceId + '/update/', {
+        method: 'POST', body: fd, headers: {'X-Requested-With': 'XMLHttpRequest'}
+    })
+    .then(function(r){ return r.json().then(function(d){ return {ok:r.ok, data:d}; }); })
+    .then(function(res) {
+        btn.disabled = false;
+        btn.textContent = 'Save Changes';
+        if (!res.ok || res.data.error) {
+            var msg = typeof res.data.error === 'object' ? JSON.stringify(res.data.error) : (res.data.error || 'Error');
+            errDiv.textContent = msg;
+            errDiv.style.display = 'block';
+        } else {
+            var d = res.data;
+            document.getElementById('bdOnHand').textContent = d.on_hand;
+            document.getElementById('bdAvail').textContent = d.available;
+            document.getElementById('bdReserved').textContent = d.reserved;
+            document.getElementById('bdMinReq').textContent = d.min_required;
+            var statusMap = {
+                'in_stock':    '<span class="badge badge-ok">In Stock</span>',
+                'low_stock':   '<span class="badge badge-warn">Low Stock</span>',
+                'out_of_stock':'<span class="badge" style="background:var(--bad);color:#fff;">Out of Stock</span>',
+            };
+            document.getElementById('bdStatus').innerHTML = statusMap[d.status] || '';
+        }
+    })
+    .catch(function(e) {
+        btn.disabled = false;
+        btn.textContent = 'Save Changes';
+        errDiv.textContent = 'Network error: ' + e.message;
+        errDiv.style.display = 'block';
+    });
 }
 </script>
 {% endblock %}

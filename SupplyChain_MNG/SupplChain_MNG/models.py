@@ -211,6 +211,7 @@ class InventoryBalance(models.Model):
     storage_bin = models.ForeignKey(StorageBin, on_delete=models.CASCADE, related_name="inventory_balances")
     on_hand = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     reserved = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    min_required = models.DecimalField(max_digits=12, decimal_places=2, default=0, help_text="Minimum stock threshold for this material in this warehouse bin.")
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
