@@ -1447,24 +1447,27 @@ def warehouse_manage_view(request, pk):
                     else "in_stock"
                 ),
             }
+        sid = b.storage_bin.store_location_id
         if zone_key not in _tree:
-            _tree[zone_key] = {"__bins__": {}, "aisles": {}}
+            _tree[zone_key] = {"__bins__": {}, "aisles": {}, "__store_id__": sid}
         if not aisle_key:
             _tree[zone_key]["__bins__"].setdefault(bin_code, []).append(item)
         else:
             _z = _tree[zone_key]["aisles"]
             if aisle_key not in _z:
-                _z[aisle_key] = {"__bins__": {}, "racks": {}}
+                _z[aisle_key] = {"__bins__": {}, "racks": {}, "__store_id__": sid}
             if not rack_key:
                 _z[aisle_key]["__bins__"].setdefault(bin_code, []).append(item)
             else:
                 _a = _z[aisle_key]["racks"]
                 if rack_key not in _a:
-                    _a[rack_key] = {"__bins__": {}, "shelves": {}}
+                    _a[rack_key] = {"__bins__": {}, "shelves": {}, "__store_id__": sid}
                 if not shelf_key:
                     _a[rack_key]["__bins__"].setdefault(bin_code, []).append(item)
                 else:
-                    _a[rack_key]["shelves"].setdefault(shelf_key, {}).setdefault(bin_code, []).append(item)
+                    if shelf_key not in _a[rack_key]["shelves"]:
+                        _a[rack_key]["shelves"][shelf_key] = {"__store_id__": sid, "__bins__": {}}
+                    _a[rack_key]["shelves"][shelf_key]["__bins__"].setdefault(bin_code, []).append(item)
 
     def _bin_list(d):
         return [{"bin_code": bc, "items": items} for bc, items in sorted(d.items())]
@@ -1474,6 +1477,8 @@ def warehouse_manage_view(request, pk):
         zd = _tree[zone_key]
         zone_obj = {
             "zone": zone_key or "(No Zone)",
+            "zone_val": zone_key,
+            "store_location_id": zd.get("__store_id__", 0),
             "bins_direct": _bin_list(zd["__bins__"]),
             "aisles": [],
         }
@@ -1481,6 +1486,8 @@ def warehouse_manage_view(request, pk):
             ad = zd["aisles"][aisle_key]
             aisle_obj = {
                 "aisle": aisle_key,
+                "aisle_val": aisle_key,
+                "store_location_id": ad.get("__store_id__", 0),
                 "bins_direct": _bin_list(ad["__bins__"]),
                 "racks": [],
             }
@@ -1488,13 +1495,18 @@ def warehouse_manage_view(request, pk):
                 rd = ad["racks"][rack_key]
                 rack_obj = {
                     "rack": rack_key,
+                    "rack_val": rack_key,
+                    "store_location_id": rd.get("__store_id__", 0),
                     "bins_direct": _bin_list(rd["__bins__"]),
                     "shelves": [],
                 }
                 for shelf_key in sorted(rd["shelves"]):
+                    sd = rd["shelves"][shelf_key]
                     rack_obj["shelves"].append({
                         "shelf": shelf_key,
-                        "bins": _bin_list(rd["shelves"][shelf_key]),
+                        "shelf_val": shelf_key,
+                        "store_location_id": sd.get("__store_id__", 0),
+                        "bins": _bin_list(sd["__bins__"]),
                     })
                 aisle_obj["racks"].append(rack_obj)
             zone_obj["aisles"].append(aisle_obj)

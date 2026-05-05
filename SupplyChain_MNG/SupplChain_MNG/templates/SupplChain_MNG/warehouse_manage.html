@@ -388,6 +388,11 @@
                 <summary>
                     <span>📦 Zone: {{ zone.zone }}</span>
                     <span class="acc-arrow">▶</span>
+                    <button type="button" class="layout-add-btn" title="Add Aisle to {{ zone.zone }}"
+                        data-store="{{ zone.store_location_id }}"
+                        data-zone="{{ zone.zone_val }}" data-aisle="" data-rack="" data-shelf=""
+                        data-ask="aisle" data-label="New Aisle in Zone {{ zone.zone }}"
+                        onclick="event.stopPropagation();openLayoutBinCreate(this)">＋ Aisle</button>
                 </summary>
                 <div class="acc-zone-body">
 
@@ -410,11 +415,19 @@
                     {% endfor %}
 
                     {# ── Aisles ── #}
+                    {% if not zone.aisles %}
+                    <div style="color:var(--muted);font-size:0.83rem;padding:6px 0 2px;">No aisles yet — use ＋ Aisle above to add one.</div>
+                    {% endif %}
                     {% for aisle_obj in zone.aisles %}
                     <details class="acc-aisle">
                         <summary>
                             <span>🛤 Aisle: {{ aisle_obj.aisle }}</span>
                             <span class="acc-arrow">▶</span>
+                            <button type="button" class="layout-add-btn" title="Add Rack to {{ aisle_obj.aisle }}"
+                                data-store="{{ aisle_obj.store_location_id }}"
+                                data-zone="{{ zone.zone_val }}" data-aisle="{{ aisle_obj.aisle_val }}" data-rack="" data-shelf=""
+                                data-ask="rack" data-label="New Rack in Aisle {{ aisle_obj.aisle }}"
+                                onclick="event.stopPropagation();openLayoutBinCreate(this)">＋ Rack</button>
                         </summary>
                         <div class="acc-aisle-body">
 
@@ -436,11 +449,19 @@
                             </div>
                             {% endfor %}
 
+                            {% if not aisle_obj.racks %}
+                            <div style="color:var(--muted);font-size:0.83rem;padding:6px 0 2px 8px;">No racks yet — use ＋ Rack above to add one.</div>
+                            {% endif %}
                             {% for rack_obj in aisle_obj.racks %}
                             <details class="acc-rack">
                                 <summary>
                                     <span>🗄 Rack: {{ rack_obj.rack }}</span>
                                     <span class="acc-arrow">▶</span>
+                                    <button type="button" class="layout-add-btn" title="Add Shelf to {{ rack_obj.rack }}"
+                                        data-store="{{ rack_obj.store_location_id }}"
+                                        data-zone="{{ zone.zone_val }}" data-aisle="{{ aisle_obj.aisle_val }}" data-rack="{{ rack_obj.rack_val }}" data-shelf=""
+                                        data-ask="shelf" data-label="New Shelf in Rack {{ rack_obj.rack }}"
+                                        onclick="event.stopPropagation();openLayoutBinCreate(this)">＋ Shelf</button>
                                 </summary>
                                 <div class="acc-rack-body">
 
@@ -462,11 +483,19 @@
                                     </div>
                                     {% endfor %}
 
+                                    {% if not rack_obj.shelves %}
+                                    <div style="color:var(--muted);font-size:0.83rem;padding:6px 0 2px 16px;">No shelves yet — use ＋ Shelf above to add one.</div>
+                                    {% endif %}
                                     {% for shelf_obj in rack_obj.shelves %}
                                     <details class="acc-shelf">
                                         <summary>
                                             <span>📂 Shelf: {{ shelf_obj.shelf }}</span>
                                             <span class="acc-arrow">▶</span>
+                                            <button type="button" class="layout-add-btn" title="Add Bin to {{ shelf_obj.shelf }}"
+                                                data-store="{{ shelf_obj.store_location_id }}"
+                                                data-zone="{{ zone.zone_val }}" data-aisle="{{ aisle_obj.aisle_val }}" data-rack="{{ rack_obj.rack_val }}" data-shelf="{{ shelf_obj.shelf_val }}"
+                                                data-ask="bin" data-label="New Bin in Shelf {{ shelf_obj.shelf }}"
+                                                onclick="event.stopPropagation();openLayoutBinCreate(this)">＋ Bin</button>
                                         </summary>
                                         <div class="acc-shelf-body">
                                             {% for bin in shelf_obj.bins %}
@@ -569,6 +598,20 @@
 <style>
 .bin-row-click { cursor:pointer; }
 .bin-row-click:hover { background:rgba(var(--brand-rgb,59,130,246),0.07); border-radius:6px; }
+.layout-add-btn {
+    margin-left:auto;
+    padding:2px 9px;
+    font-size:0.78rem;
+    font-weight:600;
+    border:1px solid var(--brand);
+    border-radius:6px;
+    background:transparent;
+    color:var(--brand);
+    cursor:pointer;
+    white-space:nowrap;
+    flex-shrink:0;
+}
+.layout-add-btn:hover { background:var(--brand); color:#fff; }
 </style>
 
 <!-- ══════════════════════════════════
@@ -1000,8 +1043,80 @@ var _qcConfig = {
             var binSel = document.getElementById('allocBin');
             binSel.value = data.id;
         }
+    },
+    layout_bin: {
+        title: '',
+        endpoint: function(){ return '/workspace/warehouse-management/' + WH_PK + '/quick-create/bin/'; },
+        fields: function(){ return ''; },
+        payload: function() {
+            var fd = new FormData();
+            fd.append('store_location', document.getElementById('qcStoreId').value);
+            fd.append('bin_code', (document.getElementById('qcBinCode') || {value:''}).value.trim());
+            fd.append('zone',  document.getElementById('qcZone').value.trim());
+            fd.append('aisle', document.getElementById('qcAisle').value.trim());
+            fd.append('rack',  document.getElementById('qcRack').value.trim());
+            fd.append('shelf', document.getElementById('qcShelf').value.trim());
+            fd.append('description', (document.getElementById('qcDesc') || {value:''}).value.trim());
+            return fd;
+        },
+        onSuccess: function() {
+            window.location.reload();
+        }
     }
 };
+
+var _qcLayoutCtx = {};
+
+function openLayoutBinCreate(btn) {
+    _qcLayoutCtx = {
+        storeId: btn.dataset.store,
+        zone:    btn.dataset.zone,
+        aisle:   btn.dataset.aisle,
+        rack:    btn.dataset.rack,
+        shelf:   btn.dataset.shelf,
+        ask:     btn.dataset.ask,
+    };
+    _qcType = 'layout_bin';
+    document.getElementById('qcTitle').textContent = btn.dataset.label;
+    document.getElementById('qcFields').innerHTML = _buildLayoutBinFields(_qcLayoutCtx);
+    document.getElementById('qcError').style.display = 'none';
+    document.getElementById('qcError').textContent = '';
+    document.getElementById('qcModal').style.display = 'flex';
+}
+
+function _escHtml(s) {
+    return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function _buildLayoutBinFields(ctx) {
+    var h = '<input type="hidden" id="qcStoreId" value="' + _escHtml(ctx.storeId) + '">';
+    h += '<input type="hidden" id="qcZone"  value="' + _escHtml(ctx.zone)  + '">';
+    if (ctx.zone)  h += '<div style="margin-bottom:6px;font-size:0.85rem;color:var(--muted);">Zone: <strong>' + _escHtml(ctx.zone) + '</strong></div>';
+    if (ctx.ask === 'aisle') {
+        h += _qcTextField('qcAisle', 'Aisle Name *', 'e.g. A1');
+        h += '<input type="hidden" id="qcRack"  value="">';
+        h += '<input type="hidden" id="qcShelf" value="">';
+    } else {
+        h += '<input type="hidden" id="qcAisle" value="' + _escHtml(ctx.aisle) + '">';
+        if (ctx.aisle) h += '<div style="margin-bottom:6px;font-size:0.85rem;color:var(--muted);">Aisle: <strong>' + _escHtml(ctx.aisle) + '</strong></div>';
+        if (ctx.ask === 'rack') {
+            h += _qcTextField('qcRack', 'Rack Name *', 'e.g. R1');
+            h += '<input type="hidden" id="qcShelf" value="">';
+        } else {
+            h += '<input type="hidden" id="qcRack" value="' + _escHtml(ctx.rack) + '">';
+            if (ctx.rack) h += '<div style="margin-bottom:6px;font-size:0.85rem;color:var(--muted);">Rack: <strong>' + _escHtml(ctx.rack) + '</strong></div>';
+            if (ctx.ask === 'shelf') {
+                h += _qcTextField('qcShelf', 'Shelf Name *', 'e.g. S1');
+            } else {
+                h += '<input type="hidden" id="qcShelf" value="' + _escHtml(ctx.shelf) + '">';
+                if (ctx.shelf) h += '<div style="margin-bottom:6px;font-size:0.85rem;color:var(--muted);">Shelf: <strong>' + _escHtml(ctx.shelf) + '</strong></div>';
+            }
+        }
+    }
+    h += _qcTextField('qcBinCode', 'Bin Code', '(auto-generated if blank)');
+    h += _qcTextField('qcDesc', 'Description', '');
+    return h;
+}
 
 function _qcTextField(id, label, placeholder) {
     return '<div style="margin-bottom:8px;"><label style="display:block;font-size:0.85rem;color:var(--muted);margin-bottom:3px;">' + label + '</label>' +
