@@ -539,7 +539,7 @@
 
             <!-- Zone -->
             <div class="field" style="margin-bottom:10px;">
-                <label style="display:block; margin-bottom:4px; font-size:0.85rem; color:var(--muted);">Zone</label>
+                <label style="display:block; margin-bottom:4px; font-size:0.85rem; color:var(--muted);">Zone <span style="color:var(--muted);font-size:0.78rem;">(optional)</span></label>
                 <select id="allocZone" onchange="cascadeAisle()"
                     style="width:100%; padding:7px 10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--text); font-size:0.9rem;">
                     <option value="">— Select store first —</option>
@@ -548,7 +548,7 @@
 
             <!-- Aisle -->
             <div class="field" style="margin-bottom:10px;">
-                <label style="display:block; margin-bottom:4px; font-size:0.85rem; color:var(--muted);">Aisle</label>
+                <label style="display:block; margin-bottom:4px; font-size:0.85rem; color:var(--muted);">Aisle <span style="color:var(--muted);font-size:0.78rem;">(optional)</span></label>
                 <select id="allocAisle" onchange="cascadeRack()"
                     style="width:100%; padding:7px 10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--text); font-size:0.9rem;">
                     <option value="">— Select zone first —</option>
@@ -557,7 +557,7 @@
 
             <!-- Rack -->
             <div class="field" style="margin-bottom:10px;">
-                <label style="display:block; margin-bottom:4px; font-size:0.85rem; color:var(--muted);">Rack</label>
+                <label style="display:block; margin-bottom:4px; font-size:0.85rem; color:var(--muted);">Rack <span style="color:var(--muted);font-size:0.78rem;">(optional)</span></label>
                 <select id="allocRack" onchange="cascadeShelf()"
                     style="width:100%; padding:7px 10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--text); font-size:0.9rem;">
                     <option value="">— Select aisle first —</option>
@@ -566,7 +566,7 @@
 
             <!-- Shelf -->
             <div class="field" style="margin-bottom:10px;">
-                <label style="display:block; margin-bottom:4px; font-size:0.85rem; color:var(--muted);">Shelf</label>
+                <label style="display:block; margin-bottom:4px; font-size:0.85rem; color:var(--muted);">Shelf <span style="color:var(--muted);font-size:0.78rem;">(optional)</span></label>
                 <select id="allocShelf" onchange="cascadeBin()"
                     style="width:100%; padding:7px 10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--text); font-size:0.9rem;">
                     <option value="">— Select rack first —</option>
@@ -575,11 +575,12 @@
 
             <!-- Bin -->
             <div class="field" style="margin-bottom:10px;">
-                <label style="display:block; margin-bottom:4px; font-size:0.85rem; color:var(--muted);">Bin</label>
+                <label style="display:block; margin-bottom:4px; font-size:0.85rem; color:var(--muted);">Bin <span style="color:var(--bad);font-size:0.78rem;">*required</span></label>
                 <select name="alloc_bin" id="allocBin" required
                     style="width:100%; padding:7px 10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--text); font-size:0.9rem;">
-                    <option value="">— Select shelf first —</option>
+                    <option value="">— Select store first —</option>
                 </select>
+                <div style="font-size:0.78rem; color:var(--muted); margin-top:3px;">Narrow down using filters above, or pick directly.</div>
             </div>
 
             <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:18px;">
@@ -611,14 +612,17 @@ document.getElementById('allocModal').addEventListener('click', function(e) {
 });
 
 function _unique(arr) {
-    return [...new Set(arr)].filter(Boolean).sort();
+    return [...new Set(arr)].filter(function(v){ return v !== null && v !== undefined; }).sort();
 }
 function _setSelect(id, values, placeholder) {
     var s = document.getElementById(id);
     s.innerHTML = '<option value="">' + placeholder + '</option>';
+    if (values.length) {
+        s.innerHTML += '<option value="__ALL__">— All —</option>';
+    }
     values.forEach(function(v) {
         var o = document.createElement('option');
-        o.value = v; o.textContent = v || '(none)';
+        o.value = v; o.textContent = v || '(unassigned)';
         s.appendChild(o);
     });
 }
@@ -628,28 +632,53 @@ function _resetFrom(ids, placeholders) {
         s.innerHTML = '<option value="">' + placeholders[i] + '</option>';
     });
 }
+function _filteredBins(storeId, zone, aisle, rack, shelf) {
+    var bins = STORES_BINS[storeId] || [];
+    if (zone && zone !== '__ALL__')  bins = bins.filter(function(b){ return b.zone === zone; });
+    if (aisle && aisle !== '__ALL__') bins = bins.filter(function(b){ return b.aisle === aisle; });
+    if (rack && rack !== '__ALL__')  bins = bins.filter(function(b){ return b.rack === rack; });
+    if (shelf && shelf !== '__ALL__') bins = bins.filter(function(b){ return b.shelf === shelf; });
+    return bins;
+}
+function _populateBinSelect(bins) {
+    var sel = document.getElementById('allocBin');
+    sel.innerHTML = '<option value="">— Select bin —</option>';
+    bins.forEach(function(b) {
+        var o = document.createElement('option');
+        o.value = b.id;
+        var parts = [b.zone, b.aisle, b.rack, b.shelf, b.bin_code].filter(Boolean);
+        o.textContent = parts.join(' / ');
+        sel.appendChild(o);
+    });
+    if (bins.length === 1) sel.value = bins[0].id;
+}
 
 function cascadeZone() {
     var storeId = document.getElementById('allocStore').value;
     _resetFrom(
-        ['allocZone','allocAisle','allocRack','allocShelf','allocBin'],
-        ['— Select zone —','— Select zone first —','— Select aisle first —','— Select rack first —','— Select shelf first —']
+        ['allocZone','allocAisle','allocRack','allocShelf'],
+        ['— Select zone —','— Select zone first —','— Select aisle first —','— Select rack first —']
     );
+    var sel = document.getElementById('allocBin');
+    sel.innerHTML = '<option value="">— Select bin —</option>';
     if (!storeId) return;
     var bins = STORES_BINS[storeId] || [];
-    _setSelect('allocZone', _unique(bins.map(function(b){ return b.zone; })), '— Select zone —');
+    _setSelect('allocZone', _unique(bins.map(function(b){ return b.zone; })), '— Select zone (optional) —');
+    _populateBinSelect(bins); // show all bins for this store immediately
 }
 
 function cascadeAisle() {
     var storeId = document.getElementById('allocStore').value;
     var zone = document.getElementById('allocZone').value;
     _resetFrom(
-        ['allocAisle','allocRack','allocShelf','allocBin'],
-        ['— Select aisle —','— Select aisle first —','— Select rack first —','— Select shelf first —']
+        ['allocAisle','allocRack','allocShelf'],
+        ['— Select aisle —','— Select aisle first —','— Select rack first —']
     );
-    if (!storeId || !zone) return;
-    var bins = (STORES_BINS[storeId] || []).filter(function(b){ return b.zone === zone; });
-    _setSelect('allocAisle', _unique(bins.map(function(b){ return b.aisle; })), '— Select aisle —');
+    var bins = _filteredBins(storeId, zone, '', '', '');
+    if (zone && zone !== '__ALL__') {
+        _setSelect('allocAisle', _unique(bins.map(function(b){ return b.aisle; })), '— Select aisle (optional) —');
+    }
+    _populateBinSelect(bins);
 }
 
 function cascadeRack() {
@@ -657,12 +686,14 @@ function cascadeRack() {
     var zone = document.getElementById('allocZone').value;
     var aisle = document.getElementById('allocAisle').value;
     _resetFrom(
-        ['allocRack','allocShelf','allocBin'],
-        ['— Select rack —','— Select rack first —','— Select shelf first —']
+        ['allocRack','allocShelf'],
+        ['— Select rack —','— Select rack first —']
     );
-    if (!storeId || !zone || !aisle) return;
-    var bins = (STORES_BINS[storeId] || []).filter(function(b){ return b.zone === zone && b.aisle === aisle; });
-    _setSelect('allocRack', _unique(bins.map(function(b){ return b.rack; })), '— Select rack —');
+    var bins = _filteredBins(storeId, zone, aisle, '', '');
+    if (aisle && aisle !== '__ALL__') {
+        _setSelect('allocRack', _unique(bins.map(function(b){ return b.rack; })), '— Select rack (optional) —');
+    }
+    _populateBinSelect(bins);
 }
 
 function cascadeShelf() {
@@ -670,15 +701,12 @@ function cascadeShelf() {
     var zone = document.getElementById('allocZone').value;
     var aisle = document.getElementById('allocAisle').value;
     var rack = document.getElementById('allocRack').value;
-    _resetFrom(
-        ['allocShelf','allocBin'],
-        ['— Select shelf —','— Select shelf first —']
-    );
-    if (!storeId || !zone || !aisle || !rack) return;
-    var bins = (STORES_BINS[storeId] || []).filter(function(b){
-        return b.zone === zone && b.aisle === aisle && b.rack === rack;
-    });
-    _setSelect('allocShelf', _unique(bins.map(function(b){ return b.shelf; })), '— Select shelf —');
+    _resetFrom(['allocShelf'], ['— Select shelf —']);
+    var bins = _filteredBins(storeId, zone, aisle, rack, '');
+    if (rack && rack !== '__ALL__') {
+        _setSelect('allocShelf', _unique(bins.map(function(b){ return b.shelf; })), '— Select shelf (optional) —');
+    }
+    _populateBinSelect(bins);
 }
 
 function cascadeBin() {
@@ -687,19 +715,7 @@ function cascadeBin() {
     var aisle = document.getElementById('allocAisle').value;
     var rack = document.getElementById('allocRack').value;
     var shelf = document.getElementById('allocShelf').value;
-    var sel = document.getElementById('allocBin');
-    sel.innerHTML = '<option value="">— Select bin —</option>';
-    if (!storeId || !zone || !aisle || !rack || !shelf) return;
-    var bins = (STORES_BINS[storeId] || []).filter(function(b){
-        return b.zone === zone && b.aisle === aisle && b.rack === rack && b.shelf === shelf;
-    });
-    bins.forEach(function(b) {
-        var o = document.createElement('option');
-        o.value = b.id;
-        o.textContent = b.bin_code;
-        sel.appendChild(o);
-    });
-    if (bins.length === 1) sel.value = bins[0].id; // auto-select if only one
+    _populateBinSelect(_filteredBins(storeId, zone, aisle, rack, shelf));
 }
 
 function switchTab(name, btn) {
