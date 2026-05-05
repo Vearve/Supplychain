@@ -1499,6 +1499,8 @@ def warehouse_manage_view(request, pk):
             }
         )
 
+    alloc_store_rows = [store for store in stores_qs if str(store.id) in stores_bins_json]
+
     # All warehouses for the jump selector
     all_warehouses = list(Warehouse.objects.filter(is_active=True).order_by("name"))
 
@@ -1524,6 +1526,7 @@ def warehouse_manage_view(request, pk):
             "warehouse_returned_goods_qty": sum([item["returned_goods_qty"] for item in project_cards]),
             "recent_movements": recent_movements,
             "alloc_materials": alloc_materials,
+            "alloc_store_rows": alloc_store_rows,
             "stores_bins_json": json.dumps(stores_bins_json),
             "all_warehouses": all_warehouses,
         }

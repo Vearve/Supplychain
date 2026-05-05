@@ -531,10 +531,13 @@
                 <select name="alloc_store" id="allocStore" required onchange="cascadeZone()"
                     style="width:100%; padding:7px 10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--text); font-size:0.9rem;">
                     <option value="">— Select store —</option>
-                    {% for s in store_rows %}
+                    {% for s in alloc_store_rows %}
                     <option value="{{ s.id }}">{{ s.name }}</option>
                     {% endfor %}
                 </select>
+                {% if not alloc_store_rows %}
+                <div style="font-size:0.82rem; color:var(--muted); margin-top:4px;">No active bins found in this warehouse yet. Create a bin first.</div>
+                {% endif %}
             </div>
 
             <!-- Zone -->
@@ -614,6 +617,12 @@ document.getElementById('allocModal').addEventListener('click', function(e) {
 function _unique(arr) {
     return [...new Set(arr)].filter(function(v){ return v !== null && v !== undefined; }).sort();
 }
+function _encodeLevelValue(v) {
+    return v === '' ? '__EMPTY__' : v;
+}
+function _decodeLevelValue(v) {
+    return v === '__EMPTY__' ? '' : v;
+}
 function _setSelect(id, values, placeholder) {
     var s = document.getElementById(id);
     s.innerHTML = '<option value="">' + placeholder + '</option>';
@@ -622,7 +631,8 @@ function _setSelect(id, values, placeholder) {
     }
     values.forEach(function(v) {
         var o = document.createElement('option');
-        o.value = v; o.textContent = v || '(unassigned)';
+        o.value = _encodeLevelValue(v);
+        o.textContent = v || '(unassigned)';
         s.appendChild(o);
     });
 }
@@ -634,6 +644,10 @@ function _resetFrom(ids, placeholders) {
 }
 function _filteredBins(storeId, zone, aisle, rack, shelf) {
     var bins = STORES_BINS[storeId] || [];
+    zone = _decodeLevelValue(zone);
+    aisle = _decodeLevelValue(aisle);
+    rack = _decodeLevelValue(rack);
+    shelf = _decodeLevelValue(shelf);
     if (zone && zone !== '__ALL__')  bins = bins.filter(function(b){ return b.zone === zone; });
     if (aisle && aisle !== '__ALL__') bins = bins.filter(function(b){ return b.aisle === aisle; });
     if (rack && rack !== '__ALL__')  bins = bins.filter(function(b){ return b.rack === rack; });
