@@ -1484,14 +1484,18 @@ def warehouse_manage_view(request, pk):
         ).distinct().order_by("name")
     )
 
-    # Store → bins mapping as JSON for cascade dropdown in allocation dialog
+    # Store → bins mapping as JSON for 5-level cascade in allocation dialog
     stores_bins_json = {}
     for b in bins_qs.filter(is_active=True):
         sid = str(b.store_location_id)
         stores_bins_json.setdefault(sid, []).append(
             {
                 "id": b.id,
-                "label": " / ".join(filter(None, [b.zone, b.aisle, b.rack, b.shelf, b.bin_code])),
+                "zone": b.zone or "",
+                "aisle": b.aisle or "",
+                "rack": b.rack or "",
+                "shelf": b.shelf or "",
+                "bin_code": b.bin_code,
             }
         )
 

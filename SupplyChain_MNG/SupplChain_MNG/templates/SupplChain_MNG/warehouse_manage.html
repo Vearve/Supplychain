@@ -501,16 +501,17 @@
 
 <!-- ── Allocation Modal ── -->
 <div id="allocModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:9999; align-items:center; justify-content:center;">
-    <div style="background:var(--card); border:1px solid var(--line); border-radius:16px; padding:24px; width:100%; max-width:460px; box-shadow:0 8px 40px rgba(0,0,0,0.3);">
+    <div style="background:var(--card); border:1px solid var(--line); border-radius:16px; padding:24px; width:100%; max-width:500px; max-height:90vh; overflow-y:auto; box-shadow:0 8px 40px rgba(0,0,0,0.3);">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-            <h3 style="margin:0;">Allocate Material to Bin</h3>
+            <h3 style="margin:0;">Allocate Material to Location</h3>
             <button onclick="closeAllocModal()" style="background:none; border:none; font-size:1.3rem; cursor:pointer; color:var(--muted);">✕</button>
         </div>
-        <form method="post">
+        <form method="post" id="allocForm">
             {% csrf_token %}
             <input type="hidden" name="action" value="allocate_material">
 
-            <div class="field">
+            <!-- Material -->
+            <div class="field" style="margin-bottom:10px;">
                 <label style="display:block; margin-bottom:4px; font-size:0.85rem; color:var(--muted);">Material</label>
                 <select name="alloc_material" id="allocMaterial" required
                     style="width:100%; padding:7px 10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--text); font-size:0.9rem;">
@@ -520,13 +521,14 @@
                     {% endfor %}
                 </select>
                 {% if not alloc_materials %}
-                <div style="font-size:0.82rem; color:var(--muted); margin-top:4px;">No materials with stock found in this warehouse. Stock In first.</div>
+                <div style="font-size:0.82rem; color:var(--muted); margin-top:4px;">No materials with stock in this warehouse. Stock In first.</div>
                 {% endif %}
             </div>
 
-            <div class="field" style="margin-top:10px;">
+            <!-- Store -->
+            <div class="field" style="margin-bottom:10px;">
                 <label style="display:block; margin-bottom:4px; font-size:0.85rem; color:var(--muted);">Store</label>
-                <select name="alloc_store" id="allocStore" required onchange="populateBins(this.value)"
+                <select name="alloc_store" id="allocStore" required onchange="cascadeZone()"
                     style="width:100%; padding:7px 10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--text); font-size:0.9rem;">
                     <option value="">— Select store —</option>
                     {% for s in store_rows %}
@@ -535,11 +537,48 @@
                 </select>
             </div>
 
-            <div class="field" style="margin-top:10px;">
-                <label style="display:block; margin-bottom:4px; font-size:0.85rem; color:var(--muted);">Bin Location</label>
-                <select name="alloc_bin" id="allocBin" required
+            <!-- Zone -->
+            <div class="field" style="margin-bottom:10px;">
+                <label style="display:block; margin-bottom:4px; font-size:0.85rem; color:var(--muted);">Zone</label>
+                <select id="allocZone" onchange="cascadeAisle()"
                     style="width:100%; padding:7px 10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--text); font-size:0.9rem;">
                     <option value="">— Select store first —</option>
+                </select>
+            </div>
+
+            <!-- Aisle -->
+            <div class="field" style="margin-bottom:10px;">
+                <label style="display:block; margin-bottom:4px; font-size:0.85rem; color:var(--muted);">Aisle</label>
+                <select id="allocAisle" onchange="cascadeRack()"
+                    style="width:100%; padding:7px 10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--text); font-size:0.9rem;">
+                    <option value="">— Select zone first —</option>
+                </select>
+            </div>
+
+            <!-- Rack -->
+            <div class="field" style="margin-bottom:10px;">
+                <label style="display:block; margin-bottom:4px; font-size:0.85rem; color:var(--muted);">Rack</label>
+                <select id="allocRack" onchange="cascadeShelf()"
+                    style="width:100%; padding:7px 10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--text); font-size:0.9rem;">
+                    <option value="">— Select aisle first —</option>
+                </select>
+            </div>
+
+            <!-- Shelf -->
+            <div class="field" style="margin-bottom:10px;">
+                <label style="display:block; margin-bottom:4px; font-size:0.85rem; color:var(--muted);">Shelf</label>
+                <select id="allocShelf" onchange="cascadeBin()"
+                    style="width:100%; padding:7px 10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--text); font-size:0.9rem;">
+                    <option value="">— Select rack first —</option>
+                </select>
+            </div>
+
+            <!-- Bin -->
+            <div class="field" style="margin-bottom:10px;">
+                <label style="display:block; margin-bottom:4px; font-size:0.85rem; color:var(--muted);">Bin</label>
+                <select name="alloc_bin" id="allocBin" required
+                    style="width:100%; padding:7px 10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--text); font-size:0.9rem;">
+                    <option value="">— Select shelf first —</option>
                 </select>
             </div>
 
@@ -559,27 +598,108 @@ function openAllocModal() {
 }
 function closeAllocModal() {
     document.getElementById('allocModal').style.display = 'none';
+    // Reset all cascade selects
+    ['allocZone','allocAisle','allocRack','allocShelf','allocBin'].forEach(function(id){
+        var s = document.getElementById(id);
+        s.innerHTML = '<option value="">—</option>';
+    });
+    document.getElementById('allocStore').value = '';
+    document.getElementById('allocMaterial').value = '';
 }
-// Close on backdrop click
 document.getElementById('allocModal').addEventListener('click', function(e) {
     if (e.target === this) closeAllocModal();
 });
 
-function populateBins(storeId) {
-    var sel = document.getElementById('allocBin');
-    sel.innerHTML = '';
-    var bins = STORES_BINS[storeId] || [];
-    if (!bins.length) {
-        sel.innerHTML = '<option value="">— No bins in this store —</option>';
-        return;
-    }
-    sel.innerHTML = '<option value="">— Select bin —</option>';
-    bins.forEach(function(b) {
-        var opt = document.createElement('option');
-        opt.value = b.id;
-        opt.textContent = b.label;
-        sel.appendChild(opt);
+function _unique(arr) {
+    return [...new Set(arr)].filter(Boolean).sort();
+}
+function _setSelect(id, values, placeholder) {
+    var s = document.getElementById(id);
+    s.innerHTML = '<option value="">' + placeholder + '</option>';
+    values.forEach(function(v) {
+        var o = document.createElement('option');
+        o.value = v; o.textContent = v || '(none)';
+        s.appendChild(o);
     });
+}
+function _resetFrom(ids, placeholders) {
+    ids.forEach(function(id, i) {
+        var s = document.getElementById(id);
+        s.innerHTML = '<option value="">' + placeholders[i] + '</option>';
+    });
+}
+
+function cascadeZone() {
+    var storeId = document.getElementById('allocStore').value;
+    _resetFrom(
+        ['allocZone','allocAisle','allocRack','allocShelf','allocBin'],
+        ['— Select zone —','— Select zone first —','— Select aisle first —','— Select rack first —','— Select shelf first —']
+    );
+    if (!storeId) return;
+    var bins = STORES_BINS[storeId] || [];
+    _setSelect('allocZone', _unique(bins.map(function(b){ return b.zone; })), '— Select zone —');
+}
+
+function cascadeAisle() {
+    var storeId = document.getElementById('allocStore').value;
+    var zone = document.getElementById('allocZone').value;
+    _resetFrom(
+        ['allocAisle','allocRack','allocShelf','allocBin'],
+        ['— Select aisle —','— Select aisle first —','— Select rack first —','— Select shelf first —']
+    );
+    if (!storeId || !zone) return;
+    var bins = (STORES_BINS[storeId] || []).filter(function(b){ return b.zone === zone; });
+    _setSelect('allocAisle', _unique(bins.map(function(b){ return b.aisle; })), '— Select aisle —');
+}
+
+function cascadeRack() {
+    var storeId = document.getElementById('allocStore').value;
+    var zone = document.getElementById('allocZone').value;
+    var aisle = document.getElementById('allocAisle').value;
+    _resetFrom(
+        ['allocRack','allocShelf','allocBin'],
+        ['— Select rack —','— Select rack first —','— Select shelf first —']
+    );
+    if (!storeId || !zone || !aisle) return;
+    var bins = (STORES_BINS[storeId] || []).filter(function(b){ return b.zone === zone && b.aisle === aisle; });
+    _setSelect('allocRack', _unique(bins.map(function(b){ return b.rack; })), '— Select rack —');
+}
+
+function cascadeShelf() {
+    var storeId = document.getElementById('allocStore').value;
+    var zone = document.getElementById('allocZone').value;
+    var aisle = document.getElementById('allocAisle').value;
+    var rack = document.getElementById('allocRack').value;
+    _resetFrom(
+        ['allocShelf','allocBin'],
+        ['— Select shelf —','— Select shelf first —']
+    );
+    if (!storeId || !zone || !aisle || !rack) return;
+    var bins = (STORES_BINS[storeId] || []).filter(function(b){
+        return b.zone === zone && b.aisle === aisle && b.rack === rack;
+    });
+    _setSelect('allocShelf', _unique(bins.map(function(b){ return b.shelf; })), '— Select shelf —');
+}
+
+function cascadeBin() {
+    var storeId = document.getElementById('allocStore').value;
+    var zone = document.getElementById('allocZone').value;
+    var aisle = document.getElementById('allocAisle').value;
+    var rack = document.getElementById('allocRack').value;
+    var shelf = document.getElementById('allocShelf').value;
+    var sel = document.getElementById('allocBin');
+    sel.innerHTML = '<option value="">— Select bin —</option>';
+    if (!storeId || !zone || !aisle || !rack || !shelf) return;
+    var bins = (STORES_BINS[storeId] || []).filter(function(b){
+        return b.zone === zone && b.aisle === aisle && b.rack === rack && b.shelf === shelf;
+    });
+    bins.forEach(function(b) {
+        var o = document.createElement('option');
+        o.value = b.id;
+        o.textContent = b.bin_code;
+        sel.appendChild(o);
+    });
+    if (bins.length === 1) sel.value = bins[0].id; // auto-select if only one
 }
 
 function switchTab(name, btn) {
