@@ -500,43 +500,45 @@
 </div><!-- /tab-movements -->
 
 <!-- ── Allocation Modal ── -->
-<div id="allocModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:9999; align-items:center; justify-content:center;">
-    <div style="background:var(--card); border:1px solid var(--line); border-radius:16px; padding:24px; width:100%; max-width:500px; max-height:90vh; overflow-y:auto; box-shadow:0 8px 40px rgba(0,0,0,0.3);">
+<div id="allocModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:9000; align-items:center; justify-content:center;">
+    <div style="background:var(--card); border:1px solid var(--line); border-radius:16px; padding:24px; width:100%; max-width:520px; max-height:92vh; overflow-y:auto; box-shadow:0 8px 40px rgba(0,0,0,0.3);">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
             <h3 style="margin:0;">Allocate Material to Location</h3>
-            <button onclick="closeAllocModal()" style="background:none; border:none; font-size:1.3rem; cursor:pointer; color:var(--muted);">✕</button>
+            <button type="button" onclick="closeAllocModal()" style="background:none; border:none; font-size:1.3rem; cursor:pointer; color:var(--muted);">✕</button>
         </div>
         <form method="post" id="allocForm">
             {% csrf_token %}
             <input type="hidden" name="action" value="allocate_material">
 
-            <!-- Material -->
+            <!-- Material — searchable typeahead -->
             <div class="field" style="margin-bottom:10px;">
                 <label style="display:block; margin-bottom:4px; font-size:0.85rem; color:var(--muted);">Material</label>
-                <select name="alloc_material" id="allocMaterial" required
-                    style="width:100%; padding:7px 10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--text); font-size:0.9rem;">
-                    <option value="">— Select material —</option>
-                    {% for mat in alloc_materials %}
-                    <option value="{{ mat.id }}">{{ mat.name }} ({{ mat.code_number }})</option>
-                    {% endfor %}
-                </select>
-                {% if not alloc_materials %}
-                <div style="font-size:0.82rem; color:var(--muted); margin-top:4px;">No materials with stock in this warehouse. Stock In first.</div>
-                {% endif %}
+                <div style="position:relative;">
+                    <input type="text" id="allocMatSearch" autocomplete="off" placeholder="Type to search materials…"
+                        style="width:100%; padding:7px 10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--text); font-size:0.9rem; box-sizing:border-box;"
+                        oninput="filterMatList(this.value)" onfocus="showMatList()" onblur="scheduleHideMatList()">
+                    <input type="hidden" name="alloc_material" id="allocMaterialHidden" required>
+                    <div id="matDropdown" style="display:none; position:absolute; top:100%; left:0; right:0; max-height:200px; overflow-y:auto; background:var(--card); border:1px solid var(--line); border-radius:0 0 8px 8px; z-index:9100; box-shadow:0 4px 16px rgba(0,0,0,0.15);">
+                    </div>
+                </div>
             </div>
 
-            <!-- Store -->
+            <!-- Store + ＋ quick-create -->
             <div class="field" style="margin-bottom:10px;">
                 <label style="display:block; margin-bottom:4px; font-size:0.85rem; color:var(--muted);">Store</label>
-                <select name="alloc_store" id="allocStore" required onchange="cascadeZone()"
-                    style="width:100%; padding:7px 10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--text); font-size:0.9rem;">
-                    <option value="">— Select store —</option>
-                    {% for s in alloc_store_rows %}
-                    <option value="{{ s.id }}">{{ s.name }}</option>
-                    {% endfor %}
-                </select>
+                <div style="display:flex; gap:6px;">
+                    <select name="alloc_store" id="allocStore" required onchange="cascadeZone()"
+                        style="flex:1; padding:7px 10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--text); font-size:0.9rem;">
+                        <option value="">— Select store —</option>
+                        {% for s in alloc_store_rows %}
+                        <option value="{{ s.id }}">{{ s.name }}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="button" title="Quick-create a new store" onclick="openQC('store')"
+                        style="padding:7px 11px; border:1px solid var(--line); border-radius:8px; background:var(--card); color:var(--brand); font-size:1.1rem; cursor:pointer; white-space:nowrap;">＋</button>
+                </div>
                 {% if not alloc_store_rows %}
-                <div style="font-size:0.82rem; color:var(--muted); margin-top:4px;">No active bins found in this warehouse yet. Create a bin first.</div>
+                <div style="font-size:0.82rem; color:var(--muted); margin-top:4px;">No bins yet — create a store then a bin using ＋.</div>
                 {% endif %}
             </div>
 
@@ -576,14 +578,18 @@
                 </select>
             </div>
 
-            <!-- Bin -->
+            <!-- Bin + ＋ quick-create -->
             <div class="field" style="margin-bottom:10px;">
                 <label style="display:block; margin-bottom:4px; font-size:0.85rem; color:var(--muted);">Bin <span style="color:var(--bad);font-size:0.78rem;">*required</span></label>
-                <select name="alloc_bin" id="allocBin" required
-                    style="width:100%; padding:7px 10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--text); font-size:0.9rem;">
-                    <option value="">— Select store first —</option>
-                </select>
-                <div style="font-size:0.78rem; color:var(--muted); margin-top:3px;">Narrow down using filters above, or pick directly.</div>
+                <div style="display:flex; gap:6px;">
+                    <select name="alloc_bin" id="allocBin" required
+                        style="flex:1; padding:7px 10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--text); font-size:0.9rem;">
+                        <option value="">— Select store first —</option>
+                    </select>
+                    <button type="button" title="Quick-create a new bin" onclick="openQC('bin')"
+                        style="padding:7px 11px; border:1px solid var(--line); border-radius:8px; background:var(--card); color:var(--brand); font-size:1.1rem; cursor:pointer; white-space:nowrap;">＋</button>
+                </div>
+                <div style="font-size:0.78rem; color:var(--muted); margin-top:3px;">Filter using options above, or click ＋ to create a bin.</div>
             </div>
 
             <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:18px;">
@@ -594,26 +600,89 @@
     </div>
 </div>
 
+<!-- ── Quick-Create Mini Dialog ── -->
+<div id="qcModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:9500; align-items:center; justify-content:center;">
+    <div style="background:var(--card); border:1px solid var(--line); border-radius:14px; padding:20px; width:100%; max-width:400px; box-shadow:0 6px 32px rgba(0,0,0,0.25);">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+            <h4 id="qcTitle" style="margin:0; font-size:1rem;"></h4>
+            <button type="button" onclick="closeQC()" style="background:none; border:none; font-size:1.2rem; cursor:pointer; color:var(--muted);">✕</button>
+        </div>
+        <div id="qcError" style="display:none; color:var(--bad); font-size:0.85rem; margin-bottom:10px; padding:6px 10px; border:1px solid var(--bad); border-radius:6px;"></div>
+        <div id="qcFields"></div>
+        <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:14px;">
+            <button type="button" class="btn btn-neutral btn-sm" onclick="closeQC()">Cancel</button>
+            <button type="button" class="btn btn-primary btn-sm" id="qcSaveBtn" onclick="saveQC()">Create</button>
+        </div>
+    </div>
+</div>
+
 <script>
 const STORES_BINS = {{ stores_bins_json|safe }};
+const ALL_MATERIALS = {{ all_materials_json|safe }};
+const WH_PK = {{ warehouse.pk }};
 
+// ── Material typeahead ──────────────────────────────────────────────────
+function filterMatList(q) {
+    var dd = document.getElementById('matDropdown');
+    q = q.toLowerCase();
+    var matches = q ? ALL_MATERIALS.filter(function(m){
+        return m.name.toLowerCase().includes(q) || (m.code_number && m.code_number.toLowerCase().includes(q));
+    }) : ALL_MATERIALS;
+    renderMatDropdown(matches.slice(0, 80));
+    dd.style.display = matches.length ? 'block' : 'none';
+}
+
+function renderMatDropdown(items) {
+    var dd = document.getElementById('matDropdown');
+    dd.innerHTML = '';
+    items.forEach(function(m) {
+        var row = document.createElement('div');
+        row.textContent = m.name + (m.code_number ? ' (' + m.code_number + ')' : '');
+        row.style.cssText = 'padding:7px 10px; cursor:pointer; font-size:0.88rem;';
+        row.onmousedown = function(e) { e.preventDefault(); selectMat(m); };
+        row.onmouseenter = function() { this.style.background = 'var(--brand-light, #e8f0fe)'; };
+        row.onmouseleave = function() { this.style.background = ''; };
+        dd.appendChild(row);
+    });
+}
+
+function showMatList() {
+    var q = document.getElementById('allocMatSearch').value;
+    filterMatList(q);
+}
+
+function scheduleHideMatList() {
+    setTimeout(function() {
+        document.getElementById('matDropdown').style.display = 'none';
+    }, 150);
+}
+
+function selectMat(m) {
+    document.getElementById('allocMatSearch').value = m.name + (m.code_number ? ' (' + m.code_number + ')' : '');
+    document.getElementById('allocMaterialHidden').value = m.id;
+    document.getElementById('matDropdown').style.display = 'none';
+}
+
+// ── Alloc modal open/close ──────────────────────────────────────────────
 function openAllocModal() {
     document.getElementById('allocModal').style.display = 'flex';
 }
 function closeAllocModal() {
     document.getElementById('allocModal').style.display = 'none';
-    // Reset all cascade selects
     ['allocZone','allocAisle','allocRack','allocShelf','allocBin'].forEach(function(id){
         var s = document.getElementById(id);
         s.innerHTML = '<option value="">—</option>';
     });
     document.getElementById('allocStore').value = '';
-    document.getElementById('allocMaterial').value = '';
+    document.getElementById('allocMatSearch').value = '';
+    document.getElementById('allocMaterialHidden').value = '';
+    document.getElementById('matDropdown').style.display = 'none';
 }
 document.getElementById('allocModal').addEventListener('click', function(e) {
     if (e.target === this) closeAllocModal();
 });
 
+// ── Cascade helpers ────────────────────────────────────────────────────
 function _unique(arr) {
     return [...new Set(arr)].filter(function(v){ return v !== null && v !== undefined; }).sort();
 }
@@ -678,9 +747,8 @@ function cascadeZone() {
     if (!storeId) return;
     var bins = STORES_BINS[storeId] || [];
     _setSelect('allocZone', _unique(bins.map(function(b){ return b.zone; })), '— Select zone (optional) —');
-    _populateBinSelect(bins); // show all bins for this store immediately
+    _populateBinSelect(bins);
 }
-
 function cascadeAisle() {
     var storeId = document.getElementById('allocStore').value;
     var zone = document.getElementById('allocZone').value;
@@ -694,22 +762,17 @@ function cascadeAisle() {
     }
     _populateBinSelect(bins);
 }
-
 function cascadeRack() {
     var storeId = document.getElementById('allocStore').value;
     var zone = document.getElementById('allocZone').value;
     var aisle = document.getElementById('allocAisle').value;
-    _resetFrom(
-        ['allocRack','allocShelf'],
-        ['— Select rack —','— Select rack first —']
-    );
+    _resetFrom(['allocRack','allocShelf'], ['— Select rack —','— Select rack first —']);
     var bins = _filteredBins(storeId, zone, aisle, '', '');
     if (aisle && aisle !== '__ALL__') {
         _setSelect('allocRack', _unique(bins.map(function(b){ return b.rack; })), '— Select rack (optional) —');
     }
     _populateBinSelect(bins);
 }
-
 function cascadeShelf() {
     var storeId = document.getElementById('allocStore').value;
     var zone = document.getElementById('allocZone').value;
@@ -722,7 +785,6 @@ function cascadeShelf() {
     }
     _populateBinSelect(bins);
 }
-
 function cascadeBin() {
     var storeId = document.getElementById('allocStore').value;
     var zone = document.getElementById('allocZone').value;
@@ -732,6 +794,145 @@ function cascadeBin() {
     _populateBinSelect(_filteredBins(storeId, zone, aisle, rack, shelf));
 }
 
+// ── Quick-Create popup ──────────────────────────────────────────────────
+var _qcType = null;
+
+var _qcConfig = {
+    store: {
+        title: 'Create New Store Location',
+        endpoint: function(){ return '/workspace/warehouse-management/' + WH_PK + '/quick-create/store/'; },
+        fields: function() {
+            return '<div style="margin-bottom:10px;"><label style="display:block;font-size:0.85rem;color:var(--muted);margin-bottom:4px;">Name <span style="color:var(--bad);">*</span></label>' +
+                '<input type="text" id="qcName" placeholder="e.g. Main Store" style="width:100%;padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text);font-size:0.9rem;box-sizing:border-box;"></div>' +
+                '<div><label style="display:block;font-size:0.85rem;color:var(--muted);margin-bottom:4px;">Type</label>' +
+                '<select id="qcLocType" style="width:100%;padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text);font-size:0.9rem;">' +
+                '<option value="HQ">HQ</option><option value="BRANCH">Branch</option><option value="SITE">Site</option><option value="OTHER">Other</option>' +
+                '</select></div>';
+        },
+        payload: function() {
+            var fd = new FormData();
+            fd.append('name', document.getElementById('qcName').value.trim());
+            fd.append('location_type', document.getElementById('qcLocType').value);
+            return fd;
+        },
+        onSuccess: function(data) {
+            // Add to alloc store select
+            var sel = document.getElementById('allocStore');
+            var opt = new Option(data.name, data.id);
+            sel.appendChild(opt);
+            sel.value = data.id;
+            // Also add empty bin slot so cascadeZone works (user must then create bin)
+            if (!STORES_BINS[data.id]) STORES_BINS[data.id] = [];
+            cascadeZone();
+        }
+    },
+    bin: {
+        title: 'Create New Storage Bin',
+        endpoint: function(){ return '/workspace/warehouse-management/' + WH_PK + '/quick-create/bin/'; },
+        fields: function() {
+            var storeId = document.getElementById('allocStore').value;
+            var storeName = storeId ? document.getElementById('allocStore').options[document.getElementById('allocStore').selectedIndex].text : '(select store first)';
+            return '<div style="margin-bottom:8px;font-size:0.85rem;color:var(--muted);">Store: <strong>' + storeName + '</strong></div>' +
+                '<input type="hidden" id="qcStoreId" value="' + (storeId||'') + '">' +
+                _qcTextField('qcZone', 'Zone', '') +
+                _qcTextField('qcAisle', 'Aisle', '') +
+                _qcTextField('qcRack', 'Rack', '') +
+                _qcTextField('qcShelf', 'Shelf', '') +
+                _qcTextField('qcBinCode', 'Bin Code', 'e.g. 001 (auto-generated if blank)') +
+                _qcTextField('qcDesc', 'Description', '');
+        },
+        payload: function() {
+            var fd = new FormData();
+            fd.append('store_location', document.getElementById('qcStoreId').value);
+            fd.append('bin_code', document.getElementById('qcBinCode').value.trim());
+            fd.append('zone', document.getElementById('qcZone').value.trim());
+            fd.append('aisle', document.getElementById('qcAisle').value.trim());
+            fd.append('rack', document.getElementById('qcRack').value.trim());
+            fd.append('shelf', document.getElementById('qcShelf').value.trim());
+            fd.append('description', document.getElementById('qcDesc').value.trim());
+            return fd;
+        },
+        onSuccess: function(data) {
+            var storeId = String(data.store_location_id);
+            if (!STORES_BINS[storeId]) STORES_BINS[storeId] = [];
+            STORES_BINS[storeId].push({
+                id: data.id,
+                bin_code: data.bin_code,
+                zone: data.zone,
+                aisle: data.aisle,
+                rack: data.rack,
+                shelf: data.shelf,
+            });
+            // Refresh cascade and select new bin
+            var storeVal = document.getElementById('allocStore').value;
+            cascadeZone();
+            // Select new bin
+            var binSel = document.getElementById('allocBin');
+            binSel.value = data.id;
+        }
+    }
+};
+
+function _qcTextField(id, label, placeholder) {
+    return '<div style="margin-bottom:8px;"><label style="display:block;font-size:0.85rem;color:var(--muted);margin-bottom:3px;">' + label + '</label>' +
+        '<input type="text" id="' + id + '" placeholder="' + placeholder + '" style="width:100%;padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text);font-size:0.9rem;box-sizing:border-box;"></div>';
+}
+
+function openQC(type) {
+    _qcType = type;
+    var cfg = _qcConfig[type];
+    document.getElementById('qcTitle').textContent = cfg.title;
+    document.getElementById('qcFields').innerHTML = cfg.fields();
+    document.getElementById('qcError').style.display = 'none';
+    document.getElementById('qcError').textContent = '';
+    document.getElementById('qcModal').style.display = 'flex';
+}
+
+function closeQC() {
+    document.getElementById('qcModal').style.display = 'none';
+    _qcType = null;
+}
+
+function saveQC() {
+    if (!_qcType) return;
+    var cfg = _qcConfig[_qcType];
+    var btn = document.getElementById('qcSaveBtn');
+    btn.disabled = true;
+    btn.textContent = 'Saving…';
+    var errDiv = document.getElementById('qcError');
+    errDiv.style.display = 'none';
+
+    var fd = cfg.payload();
+    // CSRF
+    var csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    fd.append('csrfmiddlewaretoken', csrfToken);
+
+    fetch(cfg.endpoint(), {method:'POST', body:fd, headers:{'X-Requested-With':'XMLHttpRequest'}})
+        .then(function(r){ return r.json().then(function(d){ return {ok: r.ok, data: d}; }); })
+        .then(function(res) {
+            btn.disabled = false;
+            btn.textContent = 'Create';
+            if (res.ok && !res.data.error) {
+                cfg.onSuccess(res.data);
+                closeQC();
+            } else {
+                errDiv.textContent = res.data.error || 'An error occurred.';
+                errDiv.style.display = 'block';
+            }
+        })
+        .catch(function(e) {
+            btn.disabled = false;
+            btn.textContent = 'Create';
+            errDiv.textContent = 'Network error: ' + e.message;
+            errDiv.style.display = 'block';
+        });
+}
+
+document.getElementById('qcModal').addEventListener('click', function(e) {
+    if (e.target === this) closeQC();
+});
+
+// ── Tab switching & table utils ─────────────────────────────────────────
 function switchTab(name, btn) {
     document.querySelectorAll('.wh-tab-panel').forEach(function(p){ p.classList.remove('active'); });
     document.querySelectorAll('.wh-tab-btn').forEach(function(b){ b.classList.remove('active'); });

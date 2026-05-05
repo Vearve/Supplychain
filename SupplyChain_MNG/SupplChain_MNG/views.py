@@ -1476,12 +1476,15 @@ def warehouse_manage_view(request, pk):
         )[:300]
     ]
 
-    # For allocation dialog: materials that have stock in this warehouse
-    alloc_materials = list(
-        Material.objects.filter(
-            inventory_balances__storage_bin__store_location__warehouse=warehouse,
-            inventory_balances__on_hand__gt=0,
-        ).distinct().order_by("name")
+    # All materials for allocation dialog (searchable — user should see everything)
+    all_materials = list(Material.objects.order_by("name").values("id", "name", "code_number"))
+
+    # For backward compat: materials that have stock here (used for info message)
+    alloc_materials_with_stock_ids = set(
+        InventoryBalance.objects.filter(
+            storage_bin__store_location__warehouse=warehouse,
+            on_hand__gt=0,
+        ).values_list("material_id", flat=True)
     )
 
     # Store → bins mapping as JSON for 5-level cascade in allocation dialog
@@ -1525,13 +1528,77 @@ def warehouse_manage_view(request, pk):
             "warehouse_pending_requisitions": sum([item["pending_requisitions"] for item in project_cards]),
             "warehouse_returned_goods_qty": sum([item["returned_goods_qty"] for item in project_cards]),
             "recent_movements": recent_movements,
-            "alloc_materials": alloc_materials,
+            "all_materials_json": json.dumps(all_materials),
             "alloc_store_rows": alloc_store_rows,
             "stores_bins_json": json.dumps(stores_bins_json),
             "all_warehouses": all_warehouses,
         }
     )
     return render(request, "SupplChain_MNG/warehouse_manage.html", context)
+
+
+@login_required
+def warehouse_quick_create_store(request, pk):
+    """AJAX endpoint: create a StoreLocation attached to this warehouse and return JSON."""
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    _enforce_manage_access(request.user, "warehouse")
+    warehouse = get_object_or_404(Warehouse, pk=pk)
+    name = request.POST.get("name", "").strip()
+    location_type = request.POST.get("location_type", "HQ")
+    if not name:
+        return JsonResponse({"error": "Name is required."}, status=400)
+    if StoreLocation.objects.filter(name=name, warehouse=warehouse).exists():
+        return JsonResponse({"error": f"A store named '{name}' already exists in this warehouse."}, status=400)
+    store = StoreLocation.objects.create(
+        name=name,
+        location_type=location_type,
+        warehouse=warehouse,
+        is_active=True,
+    )
+    return JsonResponse({"id": store.id, "name": store.name})
+
+
+@login_required
+def warehouse_quick_create_bin(request, pk):
+    """AJAX endpoint: create a StorageBin in a store of this warehouse and return JSON."""
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    _enforce_manage_access(request.user, "warehouse")
+    warehouse = get_object_or_404(Warehouse, pk=pk)
+    store_id = request.POST.get("store_location")
+    bin_code = request.POST.get("bin_code", "").strip()
+    zone = request.POST.get("zone", "").strip()
+    aisle = request.POST.get("aisle", "").strip()
+    rack = request.POST.get("rack", "").strip()
+    shelf = request.POST.get("shelf", "").strip()
+    description = request.POST.get("description", "").strip()
+    if not store_id:
+        return JsonResponse({"error": "Store is required."}, status=400)
+    store = get_object_or_404(StoreLocation, pk=store_id, warehouse=warehouse)
+    if bin_code and StorageBin.objects.filter(store_location=store, bin_code=bin_code).exists():
+        return JsonResponse({"error": f"Bin '{bin_code}' already exists in this store."}, status=400)
+    storage_bin = StorageBin.objects.create(
+        store_location=store,
+        bin_code=bin_code,
+        zone=zone,
+        aisle=aisle,
+        rack=rack,
+        shelf=shelf,
+        description=description,
+        is_active=True,
+    )
+    label_parts = [p for p in [storage_bin.zone, storage_bin.aisle, storage_bin.rack, storage_bin.shelf, storage_bin.bin_code] if p]
+    return JsonResponse({
+        "id": storage_bin.id,
+        "bin_code": storage_bin.bin_code,
+        "zone": storage_bin.zone,
+        "aisle": storage_bin.aisle,
+        "rack": storage_bin.rack,
+        "shelf": storage_bin.shelf,
+        "store_location_id": store.id,
+        "label": " / ".join(label_parts),
+    })
 
 
 @login_required
