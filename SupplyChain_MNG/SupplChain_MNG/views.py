@@ -1421,41 +1421,74 @@ def warehouse_manage_view(request, pk):
     for m in materials_summary:
         m["available"] = m["total_on_hand"] - m["total_reserved"]
 
-    # Layout data — hierarchical Zone → Aisle → Rack → Shelf → Bin structure
-    # Include ALL allocated bins (even zero-stock) so the layout reflects the full setup
-    _tree = {}
+    # Layout data — hierarchical Zone → Aisle → Rack → Shelf → Bin
+    # Bins only go as deep as their actual fields; empty levels are skipped entirely.
+    # Include ALL allocated bins (even zero-stock) so allocations are always visible.
+    _tree = {}  # zone → {"__bins__": {}, "aisles": {aisle → {"__bins__": {}, "racks": {rack → {"__bins__": {}, "shelves": {shelf → {bin_code: [items]}}}}}}}}
     for b in balances_qs.select_related(
         "material", "storage_bin", "storage_bin__store_location"
     )[:500]:
-        zone = b.storage_bin.zone or "Unassigned"
-        aisle = b.storage_bin.aisle or "Unassigned"
-        rack = b.storage_bin.rack or "Unassigned"
-        shelf = b.storage_bin.shelf or "Unassigned"
+        zone_key = b.storage_bin.zone or ""
+        aisle_key = b.storage_bin.aisle or ""
+        rack_key = b.storage_bin.rack or ""
+        shelf_key = b.storage_bin.shelf or ""
         bin_code = b.storage_bin.bin_code
-        _tree.setdefault(zone, {}).setdefault(aisle, {}).setdefault(rack, {}).setdefault(shelf, {}).setdefault(bin_code, []).append(
-            {
-                "material_name": b.material.name,
-                "material_code": b.material.code_number,
-                "on_hand": b.on_hand,
-                "reserved": b.reserved,
-                "available": b.on_hand - b.reserved,
-            }
-        )
+        item = {
+            "material_name": b.material.name,
+            "material_code": b.material.code_number,
+            "on_hand": b.on_hand,
+            "reserved": b.reserved,
+            "available": b.on_hand - b.reserved,
+        }
+        if zone_key not in _tree:
+            _tree[zone_key] = {"__bins__": {}, "aisles": {}}
+        if not aisle_key:
+            _tree[zone_key]["__bins__"].setdefault(bin_code, []).append(item)
+        else:
+            _z = _tree[zone_key]["aisles"]
+            if aisle_key not in _z:
+                _z[aisle_key] = {"__bins__": {}, "racks": {}}
+            if not rack_key:
+                _z[aisle_key]["__bins__"].setdefault(bin_code, []).append(item)
+            else:
+                _a = _z[aisle_key]["racks"]
+                if rack_key not in _a:
+                    _a[rack_key] = {"__bins__": {}, "shelves": {}}
+                if not shelf_key:
+                    _a[rack_key]["__bins__"].setdefault(bin_code, []).append(item)
+                else:
+                    _a[rack_key]["shelves"].setdefault(shelf_key, {}).setdefault(bin_code, []).append(item)
+
+    def _bin_list(d):
+        return [{"bin_code": bc, "items": items} for bc, items in sorted(d.items())]
 
     layout_data = []
-    for zone in sorted(_tree):
-        zone_obj = {"zone": zone, "aisles": []}
-        for aisle in sorted(_tree[zone]):
-            aisle_obj = {"aisle": aisle, "racks": []}
-            for rack in sorted(_tree[zone][aisle]):
-                rack_obj = {"rack": rack, "shelves": []}
-                for shelf in sorted(_tree[zone][aisle][rack]):
-                    shelf_obj = {"shelf": shelf, "bins": []}
-                    for bin_code in sorted(_tree[zone][aisle][rack][shelf]):
-                        shelf_obj["bins"].append(
-                            {"bin_code": bin_code, "items": _tree[zone][aisle][rack][shelf][bin_code]}
-                        )
-                    rack_obj["shelves"].append(shelf_obj)
+    for zone_key in sorted(_tree):
+        zd = _tree[zone_key]
+        zone_obj = {
+            "zone": zone_key or "(No Zone)",
+            "bins_direct": _bin_list(zd["__bins__"]),
+            "aisles": [],
+        }
+        for aisle_key in sorted(zd["aisles"]):
+            ad = zd["aisles"][aisle_key]
+            aisle_obj = {
+                "aisle": aisle_key,
+                "bins_direct": _bin_list(ad["__bins__"]),
+                "racks": [],
+            }
+            for rack_key in sorted(ad["racks"]):
+                rd = ad["racks"][rack_key]
+                rack_obj = {
+                    "rack": rack_key,
+                    "bins_direct": _bin_list(rd["__bins__"]),
+                    "shelves": [],
+                }
+                for shelf_key in sorted(rd["shelves"]):
+                    rack_obj["shelves"].append({
+                        "shelf": shelf_key,
+                        "bins": _bin_list(rd["shelves"][shelf_key]),
+                    })
                 aisle_obj["racks"].append(rack_obj)
             zone_obj["aisles"].append(aisle_obj)
         layout_data.append(zone_obj)

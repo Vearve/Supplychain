@@ -374,6 +374,9 @@
             </div>
         </div>
 
+        {# ─── reusable bin-items snippet ─────────────────────────────── #}
+        {# Used at every level where bins_direct or bins appear           #}
+
         {% if layout_data %}
         <div id="layoutAccordion">
             {% for zone in layout_data %}
@@ -383,6 +386,24 @@
                     <span class="acc-arrow">▶</span>
                 </summary>
                 <div class="acc-zone-body">
+
+                    {# ── Bins directly in this zone (no aisle set) ── #}
+                    {% for bin in zone.bins_direct %}
+                    <div style="margin-bottom:6px;">
+                        <div style="font-size:0.78rem; font-weight:700; color:var(--brand); margin-bottom:4px;">🗂 Bin: {{ bin.bin_code }}</div>
+                        {% for item in bin.items %}
+                        <div class="bin-row">
+                            <span class="bin-material">{{ item.material_name }}</span>
+                            <span style="font-size:0.78rem; color:var(--muted);">{{ item.material_code }}</span>
+                            <span class="bin-qty">On Hand: <strong>{{ item.on_hand }}</strong></span>
+                            <span class="bin-qty">Reserved: {{ item.reserved }}</span>
+                            <span class="bin-qty" style="color:{% if item.available > 0 %}var(--ok, #22c55e){% else %}var(--bad){% endif %};">Available: <strong>{{ item.available }}</strong></span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endfor %}
+
+                    {# ── Aisles ── #}
                     {% for aisle_obj in zone.aisles %}
                     <details class="acc-aisle">
                         <summary>
@@ -390,6 +411,23 @@
                             <span class="acc-arrow">▶</span>
                         </summary>
                         <div class="acc-aisle-body">
+
+                            {# Bins directly in this aisle (no rack set) #}
+                            {% for bin in aisle_obj.bins_direct %}
+                            <div style="margin-bottom:6px;">
+                                <div style="font-size:0.78rem; font-weight:700; color:var(--brand); margin-bottom:4px;">🗂 Bin: {{ bin.bin_code }}</div>
+                                {% for item in bin.items %}
+                                <div class="bin-row">
+                                    <span class="bin-material">{{ item.material_name }}</span>
+                                    <span style="font-size:0.78rem; color:var(--muted);">{{ item.material_code }}</span>
+                                    <span class="bin-qty">On Hand: <strong>{{ item.on_hand }}</strong></span>
+                                    <span class="bin-qty">Reserved: {{ item.reserved }}</span>
+                                    <span class="bin-qty" style="color:{% if item.available > 0 %}var(--ok, #22c55e){% else %}var(--bad){% endif %};">Available: <strong>{{ item.available }}</strong></span>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% endfor %}
+
                             {% for rack_obj in aisle_obj.racks %}
                             <details class="acc-rack">
                                 <summary>
@@ -397,6 +435,23 @@
                                     <span class="acc-arrow">▶</span>
                                 </summary>
                                 <div class="acc-rack-body">
+
+                                    {# Bins directly in this rack (no shelf set) #}
+                                    {% for bin in rack_obj.bins_direct %}
+                                    <div style="margin-bottom:6px;">
+                                        <div style="font-size:0.78rem; font-weight:700; color:var(--brand); margin-bottom:4px;">🗂 Bin: {{ bin.bin_code }}</div>
+                                        {% for item in bin.items %}
+                                        <div class="bin-row">
+                                            <span class="bin-material">{{ item.material_name }}</span>
+                                            <span style="font-size:0.78rem; color:var(--muted);">{{ item.material_code }}</span>
+                                            <span class="bin-qty">On Hand: <strong>{{ item.on_hand }}</strong></span>
+                                            <span class="bin-qty">Reserved: {{ item.reserved }}</span>
+                                            <span class="bin-qty" style="color:{% if item.available > 0 %}var(--ok, #22c55e){% else %}var(--bad){% endif %};">Available: <strong>{{ item.available }}</strong></span>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                    {% endfor %}
+
                                     {% for shelf_obj in rack_obj.shelves %}
                                     <details class="acc-shelf">
                                         <summary>
@@ -406,18 +461,14 @@
                                         <div class="acc-shelf-body">
                                             {% for bin in shelf_obj.bins %}
                                             <div style="margin-bottom:6px;">
-                                                <div style="font-size:0.78rem; font-weight:700; color:var(--brand); margin-bottom:4px;">
-                                                    🗂 Bin: {{ bin.bin_code }}
-                                                </div>
+                                                <div style="font-size:0.78rem; font-weight:700; color:var(--brand); margin-bottom:4px;">🗂 Bin: {{ bin.bin_code }}</div>
                                                 {% for item in bin.items %}
                                                 <div class="bin-row">
                                                     <span class="bin-material">{{ item.material_name }}</span>
                                                     <span style="font-size:0.78rem; color:var(--muted);">{{ item.material_code }}</span>
                                                     <span class="bin-qty">On Hand: <strong>{{ item.on_hand }}</strong></span>
                                                     <span class="bin-qty">Reserved: {{ item.reserved }}</span>
-                                                    <span class="bin-qty" style="color:{% if item.available > 0 %}var(--ok, #22c55e){% else %}var(--bad){% endif %};">
-                                                        Available: <strong>{{ item.available }}</strong>
-                                                    </span>
+                                                    <span class="bin-qty" style="color:{% if item.available > 0 %}var(--ok, #22c55e){% else %}var(--bad){% endif %};">Available: <strong>{{ item.available }}</strong></span>
                                                 </div>
                                                 {% endfor %}
                                             </div>
@@ -425,18 +476,21 @@
                                         </div>
                                     </details>
                                     {% endfor %}
+
                                 </div>
                             </details>
                             {% endfor %}
+
                         </div>
                     </details>
                     {% endfor %}
+
                 </div>
             </details>
             {% endfor %}
         </div>
         {% else %}
-        <div style="color:var(--muted); padding: 24px 0; text-align:center;">No stock with bin locations found for this warehouse yet.</div>
+        <div style="color:var(--muted); padding: 24px 0; text-align:center;">No allocations found for this warehouse yet. Use + Allocate Material to get started.</div>
         {% endif %}
     </section>
 </div><!-- /tab-layout -->
