@@ -1371,6 +1371,47 @@ def warehouse_manage_view(request, pk):
                 messages.success(request, "Project/site linked to this warehouse successfully.")
                 return redirect("warehouse_manage", pk=warehouse.pk)
 
+        elif action == "allocate_material":
+            material_id = request.POST.get("alloc_material")
+            bin_id = request.POST.get("alloc_bin")
+            if not material_id or not bin_id:
+                messages.error(request, "Please select both a material and a bin.")
+                return redirect("warehouse_manage", pk=warehouse.pk)
+            alloc_material = get_object_or_404(Material, pk=material_id)
+            target_bin = get_object_or_404(StorageBin, pk=bin_id, store_location__warehouse=warehouse)
+            existing_balances = list(
+                InventoryBalance.objects.filter(
+                    material=alloc_material,
+                    storage_bin__store_location__warehouse=warehouse,
+                )
+            )
+            if existing_balances:
+                total_on_hand = sum(b.on_hand for b in existing_balances)
+                total_reserved = sum(b.reserved for b in existing_balances)
+                # Delete records not at the target bin
+                for b in existing_balances:
+                    if b.storage_bin_id != target_bin.id:
+                        b.delete()
+                # Update or create the balance at target bin
+                target_balance, created = InventoryBalance.objects.get_or_create(
+                    material=alloc_material,
+                    storage_bin=target_bin,
+                    defaults={"on_hand": total_on_hand, "reserved": total_reserved},
+                )
+                if not created:
+                    target_balance.on_hand = total_on_hand
+                    target_balance.reserved = total_reserved
+                    target_balance.save(update_fields=["on_hand", "reserved", "updated_at"])
+                messages.success(
+                    request,
+                    f"{alloc_material.name} allocated to {target_bin.bin_code} "
+                    f"({target_bin.zone or '—'} / {target_bin.aisle or '—'} / "
+                    f"{target_bin.rack or '—'} / {target_bin.shelf or '—'}).",
+                )
+            else:
+                messages.warning(request, f"No inventory balance found for {alloc_material.name} in this warehouse.")
+            return redirect("warehouse_manage", pk=warehouse.pk)
+
     # Materials summary — aggregate per material across all bins in this warehouse
     materials_summary = list(
         balances_qs.filter(on_hand__gt=0)
@@ -1435,6 +1476,28 @@ def warehouse_manage_view(request, pk):
         )[:300]
     ]
 
+    # For allocation dialog: materials that have stock in this warehouse
+    alloc_materials = list(
+        Material.objects.filter(
+            inventory_balances__storage_bin__store_location__warehouse=warehouse,
+            inventory_balances__on_hand__gt=0,
+        ).distinct().order_by("name")
+    )
+
+    # Store → bins mapping as JSON for cascade dropdown in allocation dialog
+    stores_bins_json = {}
+    for b in bins_qs.filter(is_active=True):
+        sid = str(b.store_location_id)
+        stores_bins_json.setdefault(sid, []).append(
+            {
+                "id": b.id,
+                "label": " / ".join(filter(None, [b.zone, b.aisle, b.rack, b.shelf, b.bin_code])),
+            }
+        )
+
+    # All warehouses for the jump selector
+    all_warehouses = list(Warehouse.objects.filter(is_active=True).order_by("name"))
+
     context.update(
         {
             "warehouse": warehouse,
@@ -1456,6 +1519,9 @@ def warehouse_manage_view(request, pk):
             "warehouse_pending_requisitions": sum([item["pending_requisitions"] for item in project_cards]),
             "warehouse_returned_goods_qty": sum([item["returned_goods_qty"] for item in project_cards]),
             "recent_movements": recent_movements,
+            "alloc_materials": alloc_materials,
+            "stores_bins_json": json.dumps(stores_bins_json),
+            "all_warehouses": all_warehouses,
         }
     )
     return render(request, "SupplChain_MNG/warehouse_manage.html", context)

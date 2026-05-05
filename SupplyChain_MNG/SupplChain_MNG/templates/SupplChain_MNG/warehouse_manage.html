@@ -289,9 +289,20 @@
     <section class="panel panel-pad table-wrap" style="margin-bottom: 12px;">
         <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:10px;">
             <h3 style="margin: 0;">Materials In {{ warehouse.name }}</h3>
+            <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+            {% if all_warehouses|length > 1 %}
+            <select onchange="if(this.value) window.location.href=this.value;"
+                style="padding:5px 10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--text); font-size:0.88rem;">
+                <option value="">Switch Warehouse…</option>
+                {% for wh in all_warehouses %}
+                <option value="{% url 'warehouse_manage' wh.pk %}" {% if wh.pk == warehouse.pk %}selected{% endif %}>{{ wh.name }}</option>
+                {% endfor %}
+            </select>
+            {% endif %}
             <input type="search" id="matSearch" placeholder="Search material name or code…"
                 style="padding:6px 10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--text); font-size:0.88rem; width:240px;"
                 oninput="filterTable('matTable', this.value)">
+            </div>
         </div>
         <table id="matTable">
             <thead>
@@ -336,6 +347,18 @@
     <section class="panel panel-pad" style="margin-bottom: 12px;">
         <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:14px;">
             <h3 style="margin:0;">Warehouse Layout — {{ warehouse.name }}</h3>
+            <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+            {% if all_warehouses|length > 1 %}
+            <select onchange="if(this.value) window.location.href=this.value;"
+                style="padding:5px 10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--text); font-size:0.88rem;">
+                <option value="">Switch Warehouse…</option>
+                {% for wh in all_warehouses %}
+                <option value="{% url 'warehouse_manage' wh.pk %}" {% if wh.pk == warehouse.pk %}selected{% endif %}>{{ wh.name }}</option>
+                {% endfor %}
+            </select>
+            {% endif %}
+            <button class="btn btn-primary btn-sm" onclick="openAllocModal()">＋ Allocate Material</button>
+            </div>
             {% if layout_zones %}
             <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
                 <label style="font-size:0.85rem; color:var(--muted);">Jump to zone:</label>
@@ -348,6 +371,7 @@
                 <button class="btn btn-neutral btn-sm" onclick="collapseAll()">Collapse All</button>
             </div>
             {% endif %}
+            </div>
         </div>
 
         {% if layout_data %}
@@ -475,7 +499,89 @@
     </section>
 </div><!-- /tab-movements -->
 
+<!-- ── Allocation Modal ── -->
+<div id="allocModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:9999; align-items:center; justify-content:center;">
+    <div style="background:var(--card); border:1px solid var(--line); border-radius:16px; padding:24px; width:100%; max-width:460px; box-shadow:0 8px 40px rgba(0,0,0,0.3);">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+            <h3 style="margin:0;">Allocate Material to Bin</h3>
+            <button onclick="closeAllocModal()" style="background:none; border:none; font-size:1.3rem; cursor:pointer; color:var(--muted);">✕</button>
+        </div>
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="allocate_material">
+
+            <div class="field">
+                <label style="display:block; margin-bottom:4px; font-size:0.85rem; color:var(--muted);">Material</label>
+                <select name="alloc_material" id="allocMaterial" required
+                    style="width:100%; padding:7px 10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--text); font-size:0.9rem;">
+                    <option value="">— Select material —</option>
+                    {% for mat in alloc_materials %}
+                    <option value="{{ mat.id }}">{{ mat.name }} ({{ mat.code_number }})</option>
+                    {% endfor %}
+                </select>
+                {% if not alloc_materials %}
+                <div style="font-size:0.82rem; color:var(--muted); margin-top:4px;">No materials with stock found in this warehouse. Stock In first.</div>
+                {% endif %}
+            </div>
+
+            <div class="field" style="margin-top:10px;">
+                <label style="display:block; margin-bottom:4px; font-size:0.85rem; color:var(--muted);">Store</label>
+                <select name="alloc_store" id="allocStore" required onchange="populateBins(this.value)"
+                    style="width:100%; padding:7px 10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--text); font-size:0.9rem;">
+                    <option value="">— Select store —</option>
+                    {% for s in store_rows %}
+                    <option value="{{ s.id }}">{{ s.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="field" style="margin-top:10px;">
+                <label style="display:block; margin-bottom:4px; font-size:0.85rem; color:var(--muted);">Bin Location</label>
+                <select name="alloc_bin" id="allocBin" required
+                    style="width:100%; padding:7px 10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--text); font-size:0.9rem;">
+                    <option value="">— Select store first —</option>
+                </select>
+            </div>
+
+            <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:18px;">
+                <button type="button" class="btn btn-neutral" onclick="closeAllocModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save Allocation</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <script>
+const STORES_BINS = {{ stores_bins_json|safe }};
+
+function openAllocModal() {
+    document.getElementById('allocModal').style.display = 'flex';
+}
+function closeAllocModal() {
+    document.getElementById('allocModal').style.display = 'none';
+}
+// Close on backdrop click
+document.getElementById('allocModal').addEventListener('click', function(e) {
+    if (e.target === this) closeAllocModal();
+});
+
+function populateBins(storeId) {
+    var sel = document.getElementById('allocBin');
+    sel.innerHTML = '';
+    var bins = STORES_BINS[storeId] || [];
+    if (!bins.length) {
+        sel.innerHTML = '<option value="">— No bins in this store —</option>';
+        return;
+    }
+    sel.innerHTML = '<option value="">— Select bin —</option>';
+    bins.forEach(function(b) {
+        var opt = document.createElement('option');
+        opt.value = b.id;
+        opt.textContent = b.label;
+        sel.appendChild(opt);
+    });
+}
+
 function switchTab(name, btn) {
     document.querySelectorAll('.wh-tab-panel').forEach(function(p){ p.classList.remove('active'); });
     document.querySelectorAll('.wh-tab-btn').forEach(function(b){ b.classList.remove('active'); });
