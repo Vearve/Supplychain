@@ -385,10 +385,6 @@
         <div id="layoutAccordion">
             {% for zone in layout_data %}
             <details class="acc-zone" id="zone-{{ zone.zone|slugify }}">
-                {% if layout_data %}
-                <div id="layoutAccordion">
-                    {% for zone in layout_data %}
-                    <details class="acc-zone" id="zone-{{ zone.zone|slugify }}">
                         <summary>
                             <span>📦 Zone: {{ zone.zone }}</span>
                             <span class="acc-arrow">▶</span>
@@ -614,6 +610,10 @@
                     </details>
                     {% endfor %}
                 </div>
+        {% else %}
+        <div style="color:var(--muted); padding: 24px 0; text-align:center;">No allocations found for this warehouse yet. Use + Allocate Material to get started.</div>
+        {% endif %}
+    </section>
 </div><!-- /tab-layout -->
 
 <!-- ── Material Balance Detail Drawer ──────────────────────────────────── -->
@@ -1493,25 +1493,6 @@ function saveBalanceEdit() {
     .then(function(res) {
         btn.disabled = false;
         btn.textContent = 'Save Changes';
-
-        function deallocateBalance() {
-            if (!_bdBalanceId) return;
-            if (!confirm('Remove this material from the bin? Stock records will be deleted.')) return;
-            var btn = document.getElementById('bdDeallocBtn');
-            btn.disabled = true;
-            btn.textContent = 'Removing…';
-            var fd = new FormData();
-            fd.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
-            fetch('/workspace/warehouse-management/' + WH_PK + '/balance/' + _bdBalanceId + '/deallocate/', {
-                method:'POST', body:fd, headers:{'X-Requested-With':'XMLHttpRequest'}
-            })
-            .then(function(r){ return r.json(); })
-            .then(function(d) {
-                if (d.success) { window.location.reload(); }
-                else { btn.disabled = false; btn.textContent = '🗑 Remove from Bin'; alert(d.error || 'Error'); }
-            })
-            .catch(function(e){ btn.disabled = false; btn.textContent = '🗑 Remove from Bin'; alert('Network error: ' + e.message); });
-        }
         if (!res.ok || res.data.error) {
             var msg = typeof res.data.error === 'object' ? JSON.stringify(res.data.error) : (res.data.error || 'Error');
             errDiv.textContent = msg;
@@ -1536,6 +1517,25 @@ function saveBalanceEdit() {
         errDiv.textContent = 'Network error: ' + e.message;
         errDiv.style.display = 'block';
     });
+}
+
+function deallocateBalance() {
+    if (!_bdBalanceId) return;
+    if (!confirm('Remove this material from the bin? Stock records will be deleted.')) return;
+    var btn = document.getElementById('bdDeallocBtn');
+    btn.disabled = true;
+    btn.textContent = 'Removing…';
+    var fd = new FormData();
+    fd.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+    fetch('/workspace/warehouse-management/' + WH_PK + '/balance/' + _bdBalanceId + '/deallocate/', {
+        method:'POST', body:fd, headers:{'X-Requested-With':'XMLHttpRequest'}
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(d) {
+        if (d.success) { window.location.reload(); }
+        else { btn.disabled = false; btn.textContent = '🗑 Remove from Bin'; alert(d.error || 'Error'); }
+    })
+    .catch(function(e){ btn.disabled = false; btn.textContent = '🗑 Remove from Bin'; alert('Network error: ' + e.message); });
 }
 </script>
 {% endblock %}
