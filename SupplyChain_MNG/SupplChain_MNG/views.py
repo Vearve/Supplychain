@@ -1422,8 +1422,9 @@ def warehouse_manage_view(request, pk):
         m["available"] = m["total_on_hand"] - m["total_reserved"]
 
     # Layout data — hierarchical Zone → Aisle → Rack → Shelf → Bin structure
+    # Include ALL allocated bins (even zero-stock) so the layout reflects the full setup
     _tree = {}
-    for b in balances_qs.filter(on_hand__gt=0).select_related(
+    for b in balances_qs.select_related(
         "material", "storage_bin", "storage_bin__store_location"
     )[:500]:
         zone = b.storage_bin.zone or "Unassigned"
