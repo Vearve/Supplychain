@@ -135,6 +135,8 @@
     .bin-qty { color: var(--muted); white-space: nowrap; }
     .acc-arrow { font-size: 0.8rem; transition: transform 0.2s; margin-left: auto; margin-right: 4px; }
     details[open] > summary .acc-arrow { transform: rotate(90deg); }
+    .material-row-click { cursor: pointer; }
+    .material-row-click:hover { background: rgba(var(--brand-rgb,59,130,246),0.07); }
 </style>
 
 
@@ -299,7 +301,7 @@
             </thead>
             <tbody>
                 {% for m in materials_summary %}
-                <tr>
+                <tr class="material-row-click" data-material-id="{{ m.material__id }}" data-material-name="{{ m.material__name }}">
                     <td style="color:var(--muted); font-size:0.82rem;">{{ forloop.counter }}</td>
                     <td>{{ m.material__name }}</td>
                     <td style="font-size:0.85rem; color:var(--muted);">{{ m.material__code_number }}</td>
@@ -592,6 +594,22 @@
         {% endif %}
     </section>
 </div><!-- /tab-layout -->
+
+<!-- ── Material Allocation Modal ──────────────────────────────────────── -->
+<div id="matAllocModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:9050; align-items:center; justify-content:center;">
+    <div style="background:var(--card); border:1px solid var(--line); border-radius:16px; padding:20px; width:100%; max-width:720px; max-height:88vh; overflow-y:auto; box-shadow:0 8px 40px rgba(0,0,0,0.28);">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:12px;">
+            <div>
+                <h3 id="matAllocTitle" style="margin:0; font-size:1.05rem;">Material Allocations</h3>
+                <div id="matAllocCode" style="font-size:0.84rem; color:var(--muted); margin-top:4px;"></div>
+            </div>
+            <button type="button" onclick="closeMaterialAllocModal()" style="background:none; border:none; font-size:1.3rem; cursor:pointer; color:var(--muted);">✕</button>
+        </div>
+        <div id="matAllocLoading" style="text-align:center; color:var(--muted); padding:28px 0;">Loading allocations…</div>
+        <div id="matAllocError" style="display:none; color:var(--bad); font-size:0.85rem; margin-bottom:10px; padding:8px 10px; border:1px solid var(--bad); border-radius:8px;"></div>
+        <div id="matAllocBody" style="display:none;"></div>
+    </div>
+</div>
 
 <!-- ── Material Balance Detail Drawer ──────────────────────────────────── -->
 <div id="bdOverlay" onclick="closeBalanceDrawer()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.3);z-index:8000;"></div>
@@ -943,6 +961,56 @@ function closeAllocModal() {
 }
 document.getElementById('allocModal').addEventListener('click', function(e) {
     if (e.target === this) closeAllocModal();
+});
+
+function openMaterialAllocModal(materialId) {
+    document.getElementById('matAllocModal').style.display = 'flex';
+    document.getElementById('matAllocLoading').style.display = 'block';
+    document.getElementById('matAllocBody').style.display = 'none';
+    document.getElementById('matAllocError').style.display = 'none';
+    fetch('/workspace/warehouse-management/' + WH_PK + '/material/' + materialId + '/allocations/', {
+        headers: {'X-Requested-With': 'XMLHttpRequest'}
+    })
+    .then(function(r) { return r.json().then(function(d){ return {ok: r.ok, data: d}; }); })
+    .then(function(res) {
+        document.getElementById('matAllocLoading').style.display = 'none';
+        if (!res.ok || res.data.error) {
+            throw new Error(res.data.error || 'Could not load material allocations.');
+        }
+        document.getElementById('matAllocTitle').textContent = res.data.material_name + ' Allocations';
+        document.getElementById('matAllocCode').textContent = res.data.material_code || '';
+        var body = document.getElementById('matAllocBody');
+        if (!res.data.allocations.length) {
+            body.innerHTML = '<div style="color:var(--muted); padding:16px 0;">This material is not allocated anywhere in this warehouse.</div>';
+        } else {
+            body.innerHTML = res.data.allocations.map(function(a) {
+                return '<div style="border:1px solid var(--line); border-radius:10px; padding:12px; margin-bottom:10px; background:var(--bg);">' +
+                    '<div style="font-weight:600; margin-bottom:6px;">' + a.path + '</div>' +
+                    '<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(120px, 1fr)); gap:8px; font-size:0.86rem; color:var(--muted);">' +
+                        '<div>On Hand: <strong style="color:var(--text);">' + a.on_hand + '</strong></div>' +
+                        '<div>Reserved: <strong style="color:var(--text);">' + a.reserved + '</strong></div>' +
+                        '<div>Available: <strong style="color:var(--text);">' + a.available + '</strong></div>' +
+                        '<div>Min Required: <strong style="color:var(--text);">' + a.min_required + '</strong></div>' +
+                    '</div>' +
+                '</div>';
+            }).join('');
+        }
+        body.style.display = 'block';
+    })
+    .catch(function(err) {
+        document.getElementById('matAllocLoading').style.display = 'none';
+        var box = document.getElementById('matAllocError');
+        box.textContent = err.message;
+        box.style.display = 'block';
+    });
+}
+
+function closeMaterialAllocModal() {
+    document.getElementById('matAllocModal').style.display = 'none';
+}
+
+document.getElementById('matAllocModal').addEventListener('click', function(e) {
+    if (e.target === this) closeMaterialAllocModal();
 });
 
 // ── Cascade helpers ────────────────────────────────────────────────────
@@ -1586,6 +1654,9 @@ var _bdBalanceId = null;
 document.addEventListener('click', function(e) {
     var row = e.target.closest('[data-balance-id]');
     if (row) openBalanceDrawer(parseInt(row.dataset.balanceId, 10));
+
+    var materialRow = e.target.closest('[data-material-id]');
+    if (materialRow) openMaterialAllocModal(parseInt(materialRow.dataset.materialId, 10));
 });
 
 function openBalanceDrawer(balanceId) {

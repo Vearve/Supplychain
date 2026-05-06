@@ -16,6 +16,7 @@ urlpatterns = [
     path('workspace/warehouse-management/<int:pk>/quick-create/store/', views.warehouse_quick_create_store, name='warehouse_quick_create_store'),
     path('workspace/warehouse-management/<int:pk>/next-bin-code/', views.warehouse_next_bin_code, name='warehouse_next_bin_code'),
     path('workspace/warehouse-management/<int:pk>/quick-create/bin/', views.warehouse_quick_create_bin, name='warehouse_quick_create_bin'),
+    path('workspace/warehouse-management/<int:pk>/material/<int:material_id>/allocations/', views.warehouse_material_allocations, name='warehouse_material_allocations'),
     path('workspace/warehouse-management/<int:pk>/balance/<int:balance_id>/detail/', views.warehouse_balance_detail, name='warehouse_balance_detail'),
     path('workspace/warehouse-management/<int:pk>/balance/<int:balance_id>/update/', views.warehouse_balance_update, name='warehouse_balance_update'),
     path('workspace/warehouse-management/<int:pk>/balance/<int:balance_id>/deallocate/', views.warehouse_deallocate_balance, name='warehouse_deallocate_balance'),

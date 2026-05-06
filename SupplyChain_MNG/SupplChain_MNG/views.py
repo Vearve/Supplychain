@@ -1905,6 +1905,71 @@ def warehouse_balance_detail(request, pk, balance_id):
 
 
 @login_required
+def warehouse_material_allocations(request, pk, material_id):
+    """AJAX: return all allocation paths for one material in this warehouse."""
+    warehouse = get_object_or_404(Warehouse, pk=pk)
+    _enforce_manage_access(request.user, "warehouse")
+    material = get_object_or_404(Material, pk=material_id)
+    balances = list(
+        InventoryBalance.objects.select_related(
+            "storage_bin",
+            "storage_bin__store_location",
+        )
+        .filter(
+            material=material,
+            storage_bin__store_location__warehouse=warehouse,
+        )
+        .order_by(
+            "storage_bin__store_location__name",
+            "storage_bin__zone",
+            "storage_bin__aisle",
+            "storage_bin__rack",
+            "storage_bin__shelf",
+            "storage_bin__bin_code",
+        )
+    )
+
+    allocations = []
+    for balance in balances:
+        sbin = balance.storage_bin
+        path_parts = [sbin.store_location.name]
+        if sbin.zone:
+            path_parts.append(sbin.zone)
+        if sbin.aisle:
+            path_parts.append(sbin.aisle)
+        if sbin.rack:
+            path_parts.append(sbin.rack)
+        if sbin.shelf:
+            path_parts.append(sbin.shelf)
+        path_parts.append(sbin.bin_code)
+        allocations.append(
+            {
+                "balance_id": balance.pk,
+                "path": " / ".join(path_parts),
+                "store": sbin.store_location.name,
+                "zone": sbin.zone or "",
+                "aisle": sbin.aisle or "",
+                "rack": sbin.rack or "",
+                "shelf": sbin.shelf or "",
+                "bin_code": sbin.bin_code,
+                "on_hand": str(balance.on_hand),
+                "reserved": str(balance.reserved),
+                "available": str(balance.on_hand - balance.reserved),
+                "min_required": str(balance.min_required),
+            }
+        )
+
+    return JsonResponse(
+        {
+            "material_id": material.pk,
+            "material_name": material.name,
+            "material_code": material.code_number,
+            "allocations": allocations,
+        }
+    )
+
+
+@login_required
 def warehouse_balance_update(request, pk, balance_id):
     """AJAX POST: update on_hand and/or min_required for a balance record."""
     if request.method != "POST":
