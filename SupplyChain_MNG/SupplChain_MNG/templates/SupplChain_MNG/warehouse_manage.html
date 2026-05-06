@@ -1231,8 +1231,33 @@ var _qcConfig = {
             fd.append('description', (document.getElementById('qcDesc') || {value:''}).value.trim());
             return fd;
         },
-        onSuccess: function() {
-            window.location.reload();
+        onSuccess: function(data) {
+            closeQC();
+            var storeId = String(data.store_location_id);
+            if (!STORES_BINS[storeId]) STORES_BINS[storeId] = [];
+            STORES_BINS[storeId].push({
+                id: data.id,
+                bin_code: data.bin_code,
+                zone: data.zone,
+                aisle: data.aisle,
+                rack: data.rack,
+                shelf: data.shelf,
+            });
+            cascadeZone();
+            var newVal = _qcLayoutCtx[_qcLayoutCtx.ask] || '';
+            if (newVal && _qcLayoutCtx.ask === 'zone') {
+                document.getElementById('allocZone').value = _encodeLevelValue(newVal);
+                cascadeZone();
+            } else if (newVal && _qcLayoutCtx.ask === 'aisle') {
+                document.getElementById('allocAisle').value = _encodeLevelValue(newVal);
+                cascadeZone();
+            } else if (newVal && _qcLayoutCtx.ask === 'rack') {
+                document.getElementById('allocRack').value = _encodeLevelValue(newVal);
+                cascadeZone();
+            } else if (newVal && _qcLayoutCtx.ask === 'shelf') {
+                document.getElementById('allocShelf').value = _encodeLevelValue(newVal);
+                cascadeZone();
+            }
         }
     },
     edit_bin: {
