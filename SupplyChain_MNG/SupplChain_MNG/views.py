@@ -2,6 +2,7 @@ from datetime import timedelta
 import csv
 import json
 import importlib
+import logging
 from decimal import Decimal
 from io import BytesIO
 
@@ -11,13 +12,15 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth.models import Group, User
 from django.db.models import Count, F, Max, Q, Sum
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models.functions import TruncMonth
 from django.http import Http404, HttpResponse, JsonResponse
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
+
+logger = logging.getLogger(__name__)
 
 from .forms import (
     CategoryForm,
@@ -296,6 +299,18 @@ def _enforce_store_manage_scope(user, store_location_id):
     has_scope = UserStoreScope.objects.filter(user=user, store_location_id=store_location_id, can_manage=True).exists()
     if not has_scope:
         raise PermissionDenied("You do not have manage access for this store location.")
+
+
+def _next_available_bin_code(store):
+    used_numbers = {
+        int(code)
+        for code in StorageBin.objects.filter(store_location=store).values_list("bin_code", flat=True)
+        if code and code.isdigit()
+    }
+    for number in range(1, 1000):
+        if number not in used_numbers:
+            return f"{number:03d}"
+    return None
 
 
 def _project_store_context(request):
@@ -1623,6 +1638,27 @@ def warehouse_quick_create_store(request, pk):
     return JsonResponse({"id": store.id, "name": store.name})
 
 
+def warehouse_next_bin_code(request, pk):
+    """AJAX endpoint: return the next available numeric bin code for a store."""
+    if request.method != "GET":
+        return JsonResponse({"error": "GET required"}, status=405)
+    if not request.user.is_authenticated:
+        return JsonResponse({"error": "Session expired. Please refresh the page and log in again."}, status=401)
+    if not _can_manage_section(request.user, "warehouse"):
+        return JsonResponse({"error": "You do not have permission to manage warehouse records."}, status=403)
+
+    warehouse = get_object_or_404(Warehouse, pk=pk)
+    store_id = (request.GET.get("store_location") or "").strip()
+    if not store_id:
+        return JsonResponse({"error": "Store is required."}, status=400)
+
+    store = get_object_or_404(StoreLocation, pk=store_id, warehouse=warehouse)
+    code = _next_available_bin_code(store)
+    if not code:
+        return JsonResponse({"error": "No available numeric bin codes left in this store (001-999)."}, status=400)
+    return JsonResponse({"bin_code": code})
+
+
 def warehouse_quick_create_bin(request, pk):
     """AJAX endpoint: create a StorageBin in a store of this warehouse and return JSON."""
     if request.method != "POST":
@@ -1645,16 +1681,37 @@ def warehouse_quick_create_bin(request, pk):
         store = get_object_or_404(StoreLocation, pk=store_id, warehouse=warehouse)
         if bin_code and StorageBin.objects.filter(store_location=store, bin_code=bin_code).exists():
             return JsonResponse({"error": f"Bin '{bin_code}' already exists in this store."}, status=400)
-        storage_bin = StorageBin.objects.create(
-            store_location=store,
-            bin_code=bin_code,
-            zone=zone,
-            aisle=aisle,
-            rack=rack,
-            shelf=shelf,
-            description=description,
-            is_active=True,
-        )
+
+        auto_code = not bin_code
+        if auto_code:
+            bin_code = _next_available_bin_code(store)
+            if not bin_code:
+                return JsonResponse({"error": "No available numeric bin codes left in this store (001-999)."}, status=400)
+
+        storage_bin = None
+        for _ in range(5):
+            try:
+                storage_bin = StorageBin.objects.create(
+                    store_location=store,
+                    bin_code=bin_code,
+                    zone=zone,
+                    aisle=aisle,
+                    rack=rack,
+                    shelf=shelf,
+                    description=description,
+                    is_active=True,
+                )
+                break
+            except IntegrityError:
+                if not auto_code:
+                    return JsonResponse({"error": f"Bin '{bin_code}' already exists in this store."}, status=400)
+                bin_code = _next_available_bin_code(store)
+                if not bin_code:
+                    return JsonResponse({"error": "No available numeric bin codes left in this store (001-999)."}, status=400)
+
+        if storage_bin is None:
+            return JsonResponse({"error": "Could not reserve a unique bin code. Please retry."}, status=409)
+
         label_parts = [p for p in [storage_bin.zone, storage_bin.aisle, storage_bin.rack, storage_bin.shelf, storage_bin.bin_code] if p]
         return JsonResponse({
             "id": storage_bin.id,
@@ -1667,8 +1724,7 @@ def warehouse_quick_create_bin(request, pk):
             "label": " / ".join(label_parts),
         })
     except Exception as e:
-        import logging
-        logging.getLogger(__name__).exception("warehouse_quick_create_bin error")
+        logger.exception("warehouse_quick_create_bin error")
         return JsonResponse({"error": f"Server error: {e}"}, status=500)
 
 

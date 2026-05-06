@@ -186,19 +186,17 @@ class StorageBin(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.bin_code:
-            last_bin = (
-                StorageBin.objects.filter(store_location=self.store_location)
-                .exclude(bin_code="")
-                .order_by("-bin_code")
-                .first()
-            )
-            next_number = 1
-            if last_bin:
-                try:
-                    next_number = int(last_bin.bin_code) + 1
-                except ValueError:
-                    next_number = 1
-            self.bin_code = f"{next_number:03d}"
+            used_numbers = {
+                int(code)
+                for code in StorageBin.objects.filter(store_location=self.store_location).values_list("bin_code", flat=True)
+                if code and code.isdigit()
+            }
+            for number in range(1, 1000):
+                if number not in used_numbers:
+                    self.bin_code = f"{number:03d}"
+                    break
+            if not self.bin_code:
+                raise ValidationError("No available numeric bin codes left in this store (001-999).")
 
         super().save(*args, **kwargs)
 

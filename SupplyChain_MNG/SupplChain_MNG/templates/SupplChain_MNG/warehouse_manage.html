@@ -1183,7 +1183,7 @@ var _qcConfig = {
                 _qcTextField('qcAisle', 'Aisle', '') +
                 _qcTextField('qcRack', 'Rack', '') +
                 _qcTextField('qcShelf', 'Shelf', '') +
-                _qcTextField('qcBinCode', 'Bin Code', 'e.g. 001 (auto-generated if blank)') +
+                _qcBinCodeField() +
                 _qcTextField('qcDesc', 'Description', '');
         },
         payload: function() {
@@ -1385,7 +1385,7 @@ function _buildLayoutBinFields(ctx) {
             }
         }
     }
-    h += _qcTextField('qcBinCode', 'Bin Code', '(auto-generated if blank)');
+    h += _qcBinCodeField();
     h += _qcTextField('qcDesc', 'Description', '');
     return h;
 }
@@ -1393,6 +1393,48 @@ function _buildLayoutBinFields(ctx) {
 function _qcTextField(id, label, placeholder) {
     return '<div style="margin-bottom:8px;"><label style="display:block;font-size:0.85rem;color:var(--muted);margin-bottom:3px;">' + label + '</label>' +
         '<input type="text" id="' + id + '" placeholder="' + placeholder + '" style="width:100%;padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text);font-size:0.9rem;box-sizing:border-box;"></div>';
+}
+
+function _qcBinCodeField() {
+    return '<div style="margin-bottom:8px;">' +
+        '<label style="display:block;font-size:0.85rem;color:var(--muted);margin-bottom:3px;">Bin Code</label>' +
+        '<div style="display:flex;gap:8px;align-items:center;">' +
+            '<input type="text" id="qcBinCode" placeholder="e.g. 001 (auto-generated if blank)" style="flex:1;min-width:0;padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text);font-size:0.9rem;box-sizing:border-box;">' +
+            '<button type="button" onclick="autoGenerateBinCode()" style="padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface-alt);color:var(--text);cursor:pointer;">Auto</button>' +
+        '</div>' +
+    '</div>';
+}
+
+function autoGenerateBinCode() {
+    var storeEl = document.getElementById('qcStoreId');
+    var storeId = storeEl ? storeEl.value : '';
+    if (!storeId) {
+        var allocStore = document.getElementById('allocStore');
+        storeId = allocStore ? allocStore.value : '';
+    }
+    if (!storeId) {
+        alert('Select store first.');
+        return;
+    }
+
+    var errDiv = document.getElementById('qcError');
+    errDiv.style.display = 'none';
+    fetch('/workspace/warehouse-management/' + WH_PK + '/next-bin-code/?store_location=' + encodeURIComponent(storeId), {
+        headers: {'X-Requested-With': 'XMLHttpRequest'}
+    })
+        .then(function(r) { return r.json().then(function(d){ return {ok: r.ok, data: d}; }); })
+        .then(function(res) {
+            if (res.ok && !res.data.error) {
+                document.getElementById('qcBinCode').value = res.data.bin_code;
+                return;
+            }
+            errDiv.textContent = res.data.error || 'Unable to auto-generate bin code.';
+            errDiv.style.display = 'block';
+        })
+        .catch(function() {
+            errDiv.textContent = 'Unable to auto-generate bin code.';
+            errDiv.style.display = 'block';
+        });
 }
 
 function openQC(type) {
