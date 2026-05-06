@@ -141,11 +141,11 @@
 <section class="cards" style="margin-bottom: 12px;">
     <article class="metric"><div class="label">Stores</div><div class="value">{{ store_count }}</div></article>
     <article class="metric"><div class="label">Bins</div><div class="value">{{ bin_count }}</div></article>
-    <article class="metric"><div class="label">Stock Lines</div><div class="value">{{ stock_line_count }}</div></article>
+    <article class="metric"><div class="label">Materials</div><div class="value">{{ material_count }}</div></article>
     <article class="metric"><div class="label">Stock Quantity</div><div class="value">{{ warehouse_stock_qty }}</div></article>
-    <article class="metric"><div class="label">Linked Projects</div><div class="value">{{ linked_project_count }}</div></article>
-    <article class="metric"><div class="label">Pending Requisitions</div><div class="value">{{ warehouse_pending_requisitions }}</div></article>
-    <article class="metric"><div class="label">Returned Goods Qty</div><div class="value">{{ warehouse_returned_goods_qty }}</div></article>
+    <article class="metric"><div class="label">Sites/Projects Linked</div><div class="value">{{ linked_project_count }}</div></article>
+    <article class="metric"><div class="label">Material Returned Qty</div><div class="value">{{ warehouse_returned_goods_qty }}</div></article>
+    <article class="metric"><div class="label">Low Stock Materials</div><div class="value">{{ low_stock_material_count }}</div></article>
 </section>
 
 <div class="panel panel-pad" style="margin-bottom: 12px; display: flex; gap: 8px; flex-wrap: wrap;">
@@ -157,10 +157,10 @@
 
 <!-- ── Tab Bar ── -->
 <div class="wh-tabs">
-    <button class="wh-tab-btn active" onclick="switchTab('overview', this)">Overview</button>
-    <button class="wh-tab-btn" onclick="switchTab('materials', this)">Materials</button>
-    <button class="wh-tab-btn" onclick="switchTab('layout', this)">Layout</button>
-    <button class="wh-tab-btn" onclick="switchTab('movements', this)">Movements</button>
+    <button type="button" class="wh-tab-btn active" data-tab="overview" onclick="switchTab('overview', this)">Overview</button>
+    <button type="button" class="wh-tab-btn" data-tab="materials" onclick="switchTab('materials', this)">Materials</button>
+    <button type="button" class="wh-tab-btn" data-tab="layout" onclick="switchTab('layout', this)">Layout</button>
+    <button type="button" class="wh-tab-btn" data-tab="movements" onclick="switchTab('movements', this)">Movements</button>
 </div>
 
 <!-- ══════════════════════════════════
@@ -241,28 +241,6 @@
         </table>
     </section>
 
-    <section class="panel panel-pad table-wrap" style="margin-bottom: 12px;">
-        <h3 style="margin-top: 0;">Warehouse Bin Hierarchy</h3>
-        <table>
-            <thead><tr><th>Store</th><th>Zone</th><th>Aisle</th><th>Rack</th><th>Shelf</th><th>Bin</th><th>Status</th></tr></thead>
-            <tbody>
-                {% for item in bin_rows %}
-                <tr>
-                    <td>{{ item.store_location.name }}</td>
-                    <td>{{ item.zone|default:'-' }}</td>
-                    <td>{{ item.aisle|default:'-' }}</td>
-                    <td>{{ item.rack|default:'-' }}</td>
-                    <td>{{ item.shelf|default:'-' }}</td>
-                    <td>{{ item.bin_code }}</td>
-                    <td>{% if item.is_active %}<span class="badge badge-ok">Active</span>{% else %}<span class="badge badge-neutral">Inactive</span>{% endif %}</td>
-                </tr>
-                {% empty %}
-                <tr><td colspan="7">No bins available for this warehouse.</td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </section>
-
     <section class="panel panel-pad" style="margin-bottom: 12px;">
         <h3 style="margin-top: 0;">Projects / Sites Served By This Warehouse</h3>
         <div class="project-grid">
@@ -336,11 +314,11 @@
                     </td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="6" style="color:var(--muted);">No materials in stock for this warehouse yet.</td></tr>
+                <tr><td colspan="6" style="color:var(--muted);">No allocated materials in this warehouse yet.</td></tr>
                 {% endfor %}
             </tbody>
         </table>
-        <p style="color:var(--muted); font-size:0.83rem; margin-top:8px;">{{ materials_summary|length }} material line(s) in this warehouse.</p>
+        <p style="color:var(--muted); font-size:0.83rem; margin-top:8px;">{{ materials_summary|length }} material line(s) allocated in this warehouse.</p>
     </section>
 </div><!-- /tab-materials -->
 
@@ -1555,7 +1533,28 @@ function switchTab(name, btn) {
     document.querySelectorAll('.wh-tab-btn').forEach(function(b){ b.classList.remove('active'); });
     document.getElementById('tab-' + name).classList.add('active');
     btn.classList.add('active');
+    try {
+        localStorage.setItem('warehouse_manage_active_tab_' + WH_PK, name);
+    } catch (e) {
+        // Ignore localStorage failures and keep normal tab behavior.
+    }
 }
+
+function restoreActiveTab() {
+    var key = 'warehouse_manage_active_tab_' + WH_PK;
+    var tab = null;
+    try {
+        tab = localStorage.getItem(key);
+    } catch (e) {
+        tab = null;
+    }
+    var allowed = ['overview', 'materials', 'layout', 'movements'];
+    if (allowed.indexOf(tab) === -1) return;
+    var btn = document.querySelector('.wh-tab-btn[data-tab="' + tab + '"]');
+    if (btn) switchTab(tab, btn);
+}
+
+restoreActiveTab();
 
 function filterTable(tableId, query) {
     const q = query.toLowerCase();

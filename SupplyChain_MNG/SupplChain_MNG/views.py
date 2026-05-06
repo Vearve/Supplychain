@@ -1423,9 +1423,10 @@ def warehouse_manage_view(request, pk):
                 messages.success(request, f"{alloc_material.name} allocated to {bin_label}.")
             return redirect("warehouse_manage", pk=warehouse.pk)
 
-    # Materials summary — aggregate per material across all bins in this warehouse
+    # Materials summary — aggregate per material across all bins in this warehouse,
+    # including allocated materials that currently have zero on-hand.
     materials_summary = list(
-        balances_qs.filter(on_hand__gt=0)
+        balances_qs
         .values("material__id", "material__name", "material__code_number")
         .annotate(
             total_on_hand=Sum("on_hand"),
@@ -1435,6 +1436,15 @@ def warehouse_manage_view(request, pk):
     )
     for m in materials_summary:
         m["available"] = m["total_on_hand"] - m["total_reserved"]
+
+    material_count = balances_qs.values("material_id").distinct().count()
+    low_stock_material_count = (
+        balances_qs
+        .filter(min_required__gt=0, on_hand__lte=F("min_required"))
+        .values("material_id")
+        .distinct()
+        .count()
+    )
 
     # Layout data — hierarchical Zone → Aisle → Rack → Shelf → Bin
     # Bins only go as deep as their actual fields; empty levels are skipped entirely.
@@ -1602,6 +1612,8 @@ def warehouse_manage_view(request, pk):
             "linked_project_count": len(project_cards),
             "store_count": stores_qs.count(),
             "bin_count": bins_qs.count(),
+            "material_count": material_count,
+            "low_stock_material_count": low_stock_material_count,
             "stock_line_count": balances_qs.filter(on_hand__gt=0).count(),
             "warehouse_stock_qty": balances_qs.aggregate(total=Sum("on_hand"))["total"] or 0,
             "warehouse_pending_requisitions": sum([item["pending_requisitions"] for item in project_cards]),
