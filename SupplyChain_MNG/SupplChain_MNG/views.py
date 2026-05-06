@@ -1623,46 +1623,53 @@ def warehouse_quick_create_store(request, pk):
     return JsonResponse({"id": store.id, "name": store.name})
 
 
-@login_required
 def warehouse_quick_create_bin(request, pk):
     """AJAX endpoint: create a StorageBin in a store of this warehouse and return JSON."""
     if request.method != "POST":
         return JsonResponse({"error": "POST required"}, status=405)
-    _enforce_manage_access(request.user, "warehouse")
-    warehouse = get_object_or_404(Warehouse, pk=pk)
-    store_id = request.POST.get("store_location")
-    bin_code = request.POST.get("bin_code", "").strip()
-    zone = request.POST.get("zone", "").strip()
-    aisle = request.POST.get("aisle", "").strip()
-    rack = request.POST.get("rack", "").strip()
-    shelf = request.POST.get("shelf", "").strip()
-    description = request.POST.get("description", "").strip()
-    if not store_id:
-        return JsonResponse({"error": "Store is required."}, status=400)
-    store = get_object_or_404(StoreLocation, pk=store_id, warehouse=warehouse)
-    if bin_code and StorageBin.objects.filter(store_location=store, bin_code=bin_code).exists():
-        return JsonResponse({"error": f"Bin '{bin_code}' already exists in this store."}, status=400)
-    storage_bin = StorageBin.objects.create(
-        store_location=store,
-        bin_code=bin_code,
-        zone=zone,
-        aisle=aisle,
-        rack=rack,
-        shelf=shelf,
-        description=description,
-        is_active=True,
-    )
-    label_parts = [p for p in [storage_bin.zone, storage_bin.aisle, storage_bin.rack, storage_bin.shelf, storage_bin.bin_code] if p]
-    return JsonResponse({
-        "id": storage_bin.id,
-        "bin_code": storage_bin.bin_code,
-        "zone": storage_bin.zone,
-        "aisle": storage_bin.aisle,
-        "rack": storage_bin.rack,
-        "shelf": storage_bin.shelf,
-        "store_location_id": store.id,
-        "label": " / ".join(label_parts),
-    })
+    if not request.user.is_authenticated:
+        return JsonResponse({"error": "Session expired. Please refresh the page and log in again."}, status=401)
+    if not _can_manage_section(request.user, "warehouse"):
+        return JsonResponse({"error": "You do not have permission to manage warehouse records."}, status=403)
+    try:
+        warehouse = get_object_or_404(Warehouse, pk=pk)
+        store_id = request.POST.get("store_location")
+        bin_code = request.POST.get("bin_code", "").strip()
+        zone = request.POST.get("zone", "").strip()
+        aisle = request.POST.get("aisle", "").strip()
+        rack = request.POST.get("rack", "").strip()
+        shelf = request.POST.get("shelf", "").strip()
+        description = request.POST.get("description", "").strip()
+        if not store_id:
+            return JsonResponse({"error": "Store is required."}, status=400)
+        store = get_object_or_404(StoreLocation, pk=store_id, warehouse=warehouse)
+        if bin_code and StorageBin.objects.filter(store_location=store, bin_code=bin_code).exists():
+            return JsonResponse({"error": f"Bin '{bin_code}' already exists in this store."}, status=400)
+        storage_bin = StorageBin.objects.create(
+            store_location=store,
+            bin_code=bin_code,
+            zone=zone,
+            aisle=aisle,
+            rack=rack,
+            shelf=shelf,
+            description=description,
+            is_active=True,
+        )
+        label_parts = [p for p in [storage_bin.zone, storage_bin.aisle, storage_bin.rack, storage_bin.shelf, storage_bin.bin_code] if p]
+        return JsonResponse({
+            "id": storage_bin.id,
+            "bin_code": storage_bin.bin_code,
+            "zone": storage_bin.zone,
+            "aisle": storage_bin.aisle,
+            "rack": storage_bin.rack,
+            "shelf": storage_bin.shelf,
+            "store_location_id": store.id,
+            "label": " / ".join(label_parts),
+        })
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).exception("warehouse_quick_create_bin error")
+        return JsonResponse({"error": f"Server error: {e}"}, status=500)
 
 
 @login_required

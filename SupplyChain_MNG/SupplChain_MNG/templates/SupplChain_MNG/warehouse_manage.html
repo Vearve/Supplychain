@@ -1425,7 +1425,16 @@ function saveQC() {
     fd.append('csrfmiddlewaretoken', csrfToken);
 
     fetch(cfg.endpoint(), {method:'POST', body:fd, headers:{'X-Requested-With':'XMLHttpRequest'}})
-        .then(function(r){ return r.json().then(function(d){ return {ok: r.ok, data: d}; }); })
+        .then(function(r) {
+            var status = r.status;
+            var ct = r.headers.get('content-type') || '';
+            if (ct.indexOf('application/json') === -1) {
+                return r.text().then(function() {
+                    throw new Error('Server returned HTTP ' + status + '. Please refresh the page and try again.');
+                });
+            }
+            return r.json().then(function(d){ return {ok: r.ok, data: d}; });
+        })
         .then(function(res) {
             btn.disabled = false;
             btn.textContent = 'Create';
@@ -1440,7 +1449,7 @@ function saveQC() {
         .catch(function(e) {
             btn.disabled = false;
             btn.textContent = 'Create';
-            errDiv.textContent = 'Network error: ' + e.message;
+            errDiv.textContent = e.message;
             errDiv.style.display = 'block';
         });
 }
