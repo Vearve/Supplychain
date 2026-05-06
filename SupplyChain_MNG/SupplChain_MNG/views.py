@@ -3306,18 +3306,27 @@ def fleet_management_view(request):
     inactive_fleets_count = len([row for row in equipment_rows if not row.is_active])
     maintenance_due_count = len([row for row in equipment_rows if row.service_due_date and row.service_due_date <= soon])
 
-    def _fleet_due_rows(date_attr):
+    def _fleet_due_rows(date_attr, due_type):
         rows = []
         for eq in equipment_rows:
             due_date = getattr(eq, date_attr)
-            if not due_date:
+            if not due_date or due_date > soon:
                 continue
+            due_meta = _due_meta(due_date)
             rows.append(
                 {
                     "name": eq.name,
                     "location": eq.store_location.name if eq.store_location else "-",
                     "due_date": due_date.strftime("%Y-%m-%d"),
-                    "status": _due_meta(due_date)["label"],
+                    "status": due_meta["label"],
+                    "status_key": (
+                        "overdue"
+                        if due_meta["label"] == "Overdue"
+                        else "due_soon"
+                        if due_meta["label"] == "Due soon"
+                        else "on_track"
+                    ),
+                    "due_type": due_type,
                 }
             )
         return rows
@@ -3329,6 +3338,8 @@ def fleet_management_view(request):
                 "location": eq.store_location.name if eq.store_location else "-",
                 "due_date": "-",
                 "status": "Active" if eq.is_active else "Inactive",
+                "status_key": "other",
+                "due_type": "other",
             }
             for eq in equipment_rows
         ],
@@ -3338,6 +3349,8 @@ def fleet_management_view(request):
                 "location": eq.store_location.name if eq.store_location else "-",
                 "due_date": "-",
                 "status": "Active",
+                "status_key": "other",
+                "due_type": "other",
             }
             for eq in equipment_rows
             if eq.is_active
@@ -3348,20 +3361,24 @@ def fleet_management_view(request):
                 "location": eq.store_location.name if eq.store_location else "-",
                 "due_date": "-",
                 "status": "Inactive",
+                "status_key": "other",
+                "due_type": "other",
             }
             for eq in equipment_rows
             if not eq.is_active
         ],
-        "maintenance_due": _fleet_due_rows("service_due_date"),
-        "road_tax_due": _fleet_due_rows("road_tax_due_date"),
-        "fitness_due": _fleet_due_rows("fitness_due_date"),
-        "insurance_due": _fleet_due_rows("insurance_due_date"),
+        "maintenance_due": _fleet_due_rows("service_due_date", "service"),
+        "road_tax_due": _fleet_due_rows("road_tax_due_date", "road_tax"),
+        "fitness_due": _fleet_due_rows("fitness_due_date", "fitness"),
+        "insurance_due": _fleet_due_rows("insurance_due_date", "insurance"),
         "fuel_usage": [
             {
                 "name": row["equipment__name"] or "-",
                 "location": row["equipment__store_location__name"] or "-",
                 "due_date": row["last_logged"].strftime("%Y-%m-%d") if row["last_logged"] else "-",
                 "status": "Tracked",
+                "status_key": "other",
+                "due_type": "fuel",
             }
             for row in fuel_rows.values("equipment__name", "equipment__store_location__name")
             .annotate(total=Sum("quantity"), last_logged=Max("date_logged"))

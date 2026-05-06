@@ -79,7 +79,7 @@
     <table>
         <thead>
             <tr>
-                <th>Name</th><th>Reg Number</th><th>Type</th><th>Linked Store</th><th>Status</th><th>Driver</th><th>From</th><th>To</th><th>Service Due</th><th>Insurance</th><th>Actions</th>
+                <th>Name</th><th>Reg Number</th><th>Type</th><th>Linked Store</th><th>Status</th><th>Service Due</th><th>Insurance</th><th>Fitness Due</th><th>Road Tax Due</th><th>Under Maintenance</th><th>Actions</th>
             </tr>
         </thead>
         <tbody>
@@ -90,9 +90,6 @@
                 <td>{{ item.equipment_type }}</td>
                 <td>{{ item.store_location.name|default:'-' }}</td>
                 <td>{{ item.get_status_display }}</td>
-                <td>{{ item.assigned_driver.full_name|default:'-' }}</td>
-                <td>{{ item.current_route_from|default:'-' }}</td>
-                <td>{{ item.current_route_to|default:'-' }}</td>
                 <td>
                     {{ item.service_due_date|date:'Y-m-d'|default:'-' }}
                     <div><span class="badge {{ item.service_due_meta.class_name }}">{{ item.service_due_meta.label }}</span></div>
@@ -100,6 +97,21 @@
                 <td>
                     {{ item.insurance_due_date|date:'Y-m-d'|default:'-' }}
                     <div><span class="badge {{ item.insurance_due_meta.class_name }}">{{ item.insurance_due_meta.label }}</span></div>
+                </td>
+                <td>
+                    {{ item.fitness_due_date|date:'Y-m-d'|default:'-' }}
+                    <div><span class="badge {{ item.fitness_due_meta.class_name }}">{{ item.fitness_due_meta.label }}</span></div>
+                </td>
+                <td>
+                    {{ item.road_tax_due_date|date:'Y-m-d'|default:'-' }}
+                    <div><span class="badge {{ item.road_tax_due_meta.class_name }}">{{ item.road_tax_due_meta.label }}</span></div>
+                </td>
+                <td>
+                    {% if item.status == 'REPAIRING' %}
+                    <span class="badge badge-warn">Yes</span>
+                    {% else %}
+                    <span class="badge badge-neutral">No</span>
+                    {% endif %}
                 </td>
                 <td>
                     {% if can_manage_current %}
@@ -243,9 +255,27 @@
             <h3 id="fleet-dialog-title" style="margin: 0;">Fleet KPI Details</h3>
             <button type="button" class="btn btn-neutral" id="fleet-dialog-close">Close</button>
         </div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
+            <select id="fleet-filter-type" style="padding:6px 10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--text); font-size:0.88rem;">
+                <option value="">All Due Types</option>
+                <option value="service">Service</option>
+                <option value="insurance">Insurance</option>
+                <option value="fitness">Fitness</option>
+                <option value="road_tax">Road Tax</option>
+                <option value="fuel">Fuel</option>
+            </select>
+            <input id="fleet-filter-name" type="search" placeholder="Filter by name..."
+                style="padding:6px 10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--text); font-size:0.88rem; min-width:200px;">
+            <select id="fleet-filter-period" style="padding:6px 10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--text); font-size:0.88rem;">
+                <option value="">All Periods</option>
+                <option value="overdue">Overdue</option>
+                <option value="due_soon">Due soon</option>
+                <option value="on_track">On track</option>
+            </select>
+        </div>
         <div class="table-wrap">
             <table>
-                <thead><tr><th>Name</th><th>Location</th><th>Due / Last Date</th><th>Status</th></tr></thead>
+                <thead><tr><th>Name</th><th>Location</th><th>Due Type</th><th>Due / Last Date</th><th>Status</th></tr></thead>
                 <tbody id="fleet-dialog-body"></tbody>
             </table>
         </div>
@@ -262,6 +292,10 @@
     const title = document.getElementById('fleet-dialog-title');
     const closeBtn = document.getElementById('fleet-dialog-close');
     const cards = document.querySelectorAll('.kpi-click[data-dialog-key]');
+    const filterType = document.getElementById('fleet-filter-type');
+    const filterName = document.getElementById('fleet-filter-name');
+    const filterPeriod = document.getElementById('fleet-filter-period');
+    let activeRows = [];
 
     const labels = {
         total_vehicles: 'Total Vehicles',
@@ -274,23 +308,59 @@
         insurance_due: 'Insurance Due'
     };
 
+    const dueTypeLabels = {
+        service: 'Service',
+        insurance: 'Insurance',
+        fitness: 'Fitness',
+        road_tax: 'Road Tax',
+        fuel: 'Fuel',
+        other: '-'
+    };
+
+    function applyDialogFilters(rows) {
+        const typeVal = filterType.value;
+        const nameVal = filterName.value.trim().toLowerCase();
+        const periodVal = filterPeriod.value;
+        return rows.filter(function(row) {
+            const rowType = row.due_type || 'other';
+            const rowName = (row.name || '').toLowerCase();
+            const rowPeriod = row.status_key || 'other';
+            if (typeVal && rowType !== typeVal) return false;
+            if (nameVal && rowName.indexOf(nameVal) === -1) return false;
+            if (periodVal && rowPeriod !== periodVal) return false;
+            return true;
+        });
+    }
+
+    function renderDialogRows(rows) {
+        body.innerHTML = '';
+        if (!rows.length) {
+            body.innerHTML = '<tr><td colspan="5">No records match current filters.</td></tr>';
+            return;
+        }
+        rows.forEach(function (row) {
+            const tr = document.createElement('tr');
+            tr.innerHTML = '<td>' + (row.name || '-') + '</td>'
+                + '<td>' + (row.location || '-') + '</td>'
+                + '<td>' + (dueTypeLabels[row.due_type || 'other'] || '-') + '</td>'
+                + '<td>' + (row.due_date || '-') + '</td>'
+                + '<td>' + (row.status || '-') + '</td>';
+            body.appendChild(tr);
+        });
+    }
+
+    function refreshDialogRows() {
+        renderDialogRows(applyDialogFilters(activeRows));
+    }
+
     function openDialog(key) {
         const rows = fleetData[key] || [];
         title.textContent = labels[key] || 'Fleet KPI Details';
-        body.innerHTML = '';
-
-        if (!rows.length) {
-            body.innerHTML = '<tr><td colspan="4">No records available.</td></tr>';
-        } else {
-            rows.forEach(function (row) {
-                const tr = document.createElement('tr');
-                tr.innerHTML = '<td>' + (row.name || '-') + '</td>'
-                    + '<td>' + (row.location || '-') + '</td>'
-                    + '<td>' + (row.due_date || '-') + '</td>'
-                    + '<td>' + (row.status || '-') + '</td>';
-                body.appendChild(tr);
-            });
-        }
+        activeRows = rows;
+        filterType.value = '';
+        filterName.value = '';
+        filterPeriod.value = '';
+        refreshDialogRows();
         overlay.style.display = 'flex';
     }
 
@@ -305,6 +375,9 @@
     });
 
     closeBtn.addEventListener('click', closeDialog);
+    filterType.addEventListener('change', refreshDialogRows);
+    filterName.addEventListener('input', refreshDialogRows);
+    filterPeriod.addEventListener('change', refreshDialogRows);
     overlay.addEventListener('click', function (evt) {
         if (evt.target === overlay) {
             closeDialog();
