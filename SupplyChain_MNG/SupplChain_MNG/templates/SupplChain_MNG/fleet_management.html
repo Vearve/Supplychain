@@ -76,7 +76,25 @@
 
 <section class="panel panel-pad table-wrap" style="margin-bottom: 12px;">
     <h3 style="margin-top: 0;">Mobile Equipment</h3>
-    <table>
+    <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
+        <select id="eq-filter-due-type" style="padding:6px 10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--text); font-size:0.88rem;">
+            <option value="">All Due Types</option>
+            <option value="service">Service</option>
+            <option value="insurance">Insurance</option>
+            <option value="fitness">Fitness</option>
+            <option value="road_tax">Road Tax</option>
+            <option value="maintenance">Under Maintenance</option>
+        </select>
+        <select id="eq-filter-period" style="padding:6px 10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--text); font-size:0.88rem;">
+            <option value="">All Periods</option>
+            <option value="overdue">Overdue</option>
+            <option value="due_soon">Due soon</option>
+            <option value="on_track">On track</option>
+        </select>
+        <input id="eq-filter-name" type="search" placeholder="Filter by name..."
+            style="padding:6px 10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--text); font-size:0.88rem; min-width:220px;">
+    </div>
+    <table id="fleet-equipment-table">
         <thead>
             <tr>
                 <th>Name</th><th>Reg Number</th><th>Type</th><th>Linked Store</th><th>Status</th><th>Service Due</th><th>Insurance</th><th>Fitness Due</th><th>Road Tax Due</th><th>Under Maintenance</th><th>Actions</th>
@@ -84,7 +102,13 @@
         </thead>
         <tbody>
             {% for item in equipment_rows %}
-            <tr>
+            <tr class="fleet-eq-row"
+                data-eq-name="{{ item.name|lower }}"
+                data-under-maintenance="{% if item.status == 'REPAIRING' %}yes{% else %}no{% endif %}"
+                data-service-status="{% if item.service_due_meta.label == 'Overdue' %}overdue{% elif item.service_due_meta.label == 'Due soon' %}due_soon{% elif item.service_due_meta.label == 'On track' %}on_track{% else %}none{% endif %}"
+                data-insurance-status="{% if item.insurance_due_meta.label == 'Overdue' %}overdue{% elif item.insurance_due_meta.label == 'Due soon' %}due_soon{% elif item.insurance_due_meta.label == 'On track' %}on_track{% else %}none{% endif %}"
+                data-fitness-status="{% if item.fitness_due_meta.label == 'Overdue' %}overdue{% elif item.fitness_due_meta.label == 'Due soon' %}due_soon{% elif item.fitness_due_meta.label == 'On track' %}on_track{% else %}none{% endif %}"
+                data-road-tax-status="{% if item.road_tax_due_meta.label == 'Overdue' %}overdue{% elif item.road_tax_due_meta.label == 'Due soon' %}due_soon{% elif item.road_tax_due_meta.label == 'On track' %}on_track{% else %}none{% endif %}">
                 <td>{{ item.name }}</td>
                 <td>{{ item.registration_number }}</td>
                 <td>{{ item.equipment_type }}</td>
@@ -125,6 +149,7 @@
             {% empty %}
             <tr><td colspan="11">No mobile equipment found.</td></tr>
             {% endfor %}
+            <tr id="fleet-eq-no-match" style="display:none;"><td colspan="11">No equipment matches current filters.</td></tr>
         </tbody>
     </table>
 </section>
@@ -295,6 +320,11 @@
     const filterType = document.getElementById('fleet-filter-type');
     const filterName = document.getElementById('fleet-filter-name');
     const filterPeriod = document.getElementById('fleet-filter-period');
+    const eqFilterType = document.getElementById('eq-filter-due-type');
+    const eqFilterName = document.getElementById('eq-filter-name');
+    const eqFilterPeriod = document.getElementById('eq-filter-period');
+    const eqRows = document.querySelectorAll('#fleet-equipment-table tbody .fleet-eq-row');
+    const eqNoMatch = document.getElementById('fleet-eq-no-match');
     let activeRows = [];
 
     const labels = {
@@ -368,6 +398,50 @@
         overlay.style.display = 'none';
     }
 
+    function applyEquipmentFilters() {
+        if (!eqRows.length) return;
+        const typeVal = eqFilterType.value;
+        const nameVal = eqFilterName.value.trim().toLowerCase();
+        const periodVal = eqFilterPeriod.value;
+        let visibleCount = 0;
+
+        eqRows.forEach(function (row) {
+            let ok = true;
+            const rowName = row.dataset.eqName || '';
+            const statuses = {
+                service: row.dataset.serviceStatus || 'none',
+                insurance: row.dataset.insuranceStatus || 'none',
+                fitness: row.dataset.fitnessStatus || 'none',
+                road_tax: row.dataset.roadTaxStatus || 'none'
+            };
+
+            if (nameVal && rowName.indexOf(nameVal) === -1) {
+                ok = false;
+            }
+
+            if (ok && typeVal) {
+                if (typeVal === 'maintenance') {
+                    if (row.dataset.underMaintenance !== 'yes') ok = false;
+                    if (ok && periodVal) ok = false;
+                } else {
+                    const st = statuses[typeVal] || 'none';
+                    if (st === 'none') ok = false;
+                    if (ok && periodVal && st !== periodVal) ok = false;
+                }
+            } else if (ok && periodVal) {
+                const list = [statuses.service, statuses.insurance, statuses.fitness, statuses.road_tax];
+                if (list.indexOf(periodVal) === -1) ok = false;
+            }
+
+            row.style.display = ok ? '' : 'none';
+            if (ok) visibleCount += 1;
+        });
+
+        if (eqNoMatch) {
+            eqNoMatch.style.display = visibleCount ? 'none' : '';
+        }
+    }
+
     cards.forEach(function (card) {
         card.addEventListener('click', function () {
             openDialog(card.getAttribute('data-dialog-key'));
@@ -378,6 +452,9 @@
     filterType.addEventListener('change', refreshDialogRows);
     filterName.addEventListener('input', refreshDialogRows);
     filterPeriod.addEventListener('change', refreshDialogRows);
+    if (eqFilterType) eqFilterType.addEventListener('change', applyEquipmentFilters);
+    if (eqFilterName) eqFilterName.addEventListener('input', applyEquipmentFilters);
+    if (eqFilterPeriod) eqFilterPeriod.addEventListener('change', applyEquipmentFilters);
     overlay.addEventListener('click', function (evt) {
         if (evt.target === overlay) {
             closeDialog();
