@@ -815,37 +815,53 @@
             <!-- Zone -->
             <div class="field" style="margin-bottom:10px;">
                 <label style="display:block; margin-bottom:4px; font-size:0.85rem; color:var(--muted);">Zone <span style="color:var(--muted);font-size:0.78rem;">(optional)</span></label>
-                <select id="allocZone" onchange="cascadeAisle()"
-                    style="width:100%; padding:7px 10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--text); font-size:0.9rem;">
-                    <option value="">— Select store first —</option>
-                </select>
+                <div style="display:flex; gap:6px;">
+                    <select id="allocZone" onchange="cascadeAisle()"
+                        style="flex:1; padding:7px 10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--text); font-size:0.9rem;">
+                        <option value="">— Select store first —</option>
+                    </select>
+                    <button type="button" title="Quick-create a new zone" onclick="openAllocLevelQC('zone')"
+                        style="padding:7px 11px; border:1px solid var(--line); border-radius:8px; background:var(--card); color:var(--brand); font-size:1.1rem; cursor:pointer; white-space:nowrap;">＋</button>
+                </div>
             </div>
 
             <!-- Aisle -->
             <div class="field" style="margin-bottom:10px;">
                 <label style="display:block; margin-bottom:4px; font-size:0.85rem; color:var(--muted);">Aisle <span style="color:var(--muted);font-size:0.78rem;">(optional)</span></label>
-                <select id="allocAisle" onchange="cascadeRack()"
-                    style="width:100%; padding:7px 10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--text); font-size:0.9rem;">
-                    <option value="">— Select zone first —</option>
-                </select>
+                <div style="display:flex; gap:6px;">
+                    <select id="allocAisle" onchange="cascadeRack()"
+                        style="flex:1; padding:7px 10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--text); font-size:0.9rem;">
+                        <option value="">— Select zone first —</option>
+                    </select>
+                    <button type="button" title="Quick-create a new aisle" onclick="openAllocLevelQC('aisle')"
+                        style="padding:7px 11px; border:1px solid var(--line); border-radius:8px; background:var(--card); color:var(--brand); font-size:1.1rem; cursor:pointer; white-space:nowrap;">＋</button>
+                </div>
             </div>
 
             <!-- Rack -->
             <div class="field" style="margin-bottom:10px;">
                 <label style="display:block; margin-bottom:4px; font-size:0.85rem; color:var(--muted);">Rack <span style="color:var(--muted);font-size:0.78rem;">(optional)</span></label>
-                <select id="allocRack" onchange="cascadeShelf()"
-                    style="width:100%; padding:7px 10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--text); font-size:0.9rem;">
-                    <option value="">— Select aisle first —</option>
-                </select>
+                <div style="display:flex; gap:6px;">
+                    <select id="allocRack" onchange="cascadeShelf()"
+                        style="flex:1; padding:7px 10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--text); font-size:0.9rem;">
+                        <option value="">— Select aisle first —</option>
+                    </select>
+                    <button type="button" title="Quick-create a new rack" onclick="openAllocLevelQC('rack')"
+                        style="padding:7px 11px; border:1px solid var(--line); border-radius:8px; background:var(--card); color:var(--brand); font-size:1.1rem; cursor:pointer; white-space:nowrap;">＋</button>
+                </div>
             </div>
 
             <!-- Shelf -->
             <div class="field" style="margin-bottom:10px;">
                 <label style="display:block; margin-bottom:4px; font-size:0.85rem; color:var(--muted);">Shelf <span style="color:var(--muted);font-size:0.78rem;">(optional)</span></label>
-                <select id="allocShelf" onchange="cascadeBin()"
-                    style="width:100%; padding:7px 10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--text); font-size:0.9rem;">
-                    <option value="">— Select rack first —</option>
-                </select>
+                <div style="display:flex; gap:6px;">
+                    <select id="allocShelf" onchange="cascadeBin()"
+                        style="flex:1; padding:7px 10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--text); font-size:0.9rem;">
+                        <option value="">— Select rack first —</option>
+                    </select>
+                    <button type="button" title="Quick-create a new shelf" onclick="openAllocLevelQC('shelf')"
+                        style="padding:7px 11px; border:1px solid var(--line); border-radius:8px; background:var(--card); color:var(--brand); font-size:1.1rem; cursor:pointer; white-space:nowrap;">＋</button>
+                </div>
             </div>
 
             <!-- Bin + ＋ quick-create -->
@@ -962,6 +978,65 @@ function _encodeLevelValue(v) {
 function _decodeLevelValue(v) {
     return v === '__EMPTY__' ? '' : v;
 }
+
+function _allocSelectedValue(id, label, required) {
+    var v = document.getElementById(id).value;
+    if (!v) {
+        if (required) alert('Select ' + label + ' first.');
+        return '';
+    }
+    v = _decodeLevelValue(v);
+    if (v === '__ALL__') {
+        alert('Select a specific ' + label + ' first (not All).');
+        return null;
+    }
+    return v;
+}
+
+function openAllocLevelQC(level) {
+    var storeId = document.getElementById('allocStore').value;
+    if (!storeId) {
+        alert('Select store first.');
+        return;
+    }
+
+    var zone = _allocSelectedValue('allocZone', 'zone', level !== 'zone');
+    if (zone === null) return;
+    if (level !== 'zone' && !zone) return;
+
+    var aisle = '';
+    if (level === 'rack' || level === 'shelf') {
+        aisle = _allocSelectedValue('allocAisle', 'aisle', true);
+        if (aisle === null || !aisle) return;
+    }
+
+    var rack = '';
+    if (level === 'shelf') {
+        rack = _allocSelectedValue('allocRack', 'rack', true);
+        if (rack === null || !rack) return;
+    }
+
+    var askMap = {zone:'zone', aisle:'aisle', rack:'rack', shelf:'shelf'};
+    var labelMap = {
+        zone: 'New Zone (with initial bin)',
+        aisle: 'New Aisle (with initial bin)',
+        rack: 'New Rack (with initial bin)',
+        shelf: 'New Shelf (with initial bin)'
+    };
+
+    openLayoutBinCreate({
+        dataset: {
+            store: storeId,
+            zone: zone || '',
+            aisle: aisle || '',
+            rack: rack || '',
+            shelf: '',
+            ask: askMap[level],
+            label: labelMap[level]
+        }
+    });
+}
+
 function _setSelect(id, values, placeholder) {
     var s = document.getElementById(id);
     s.innerHTML = '<option value="">' + placeholder + '</option>';
@@ -1280,13 +1355,20 @@ function _escHtml(s) {
 
 function _buildLayoutBinFields(ctx) {
     var h = '<input type="hidden" id="qcStoreId" value="' + _escHtml(ctx.storeId) + '">';
-    h += '<input type="hidden" id="qcZone"  value="' + _escHtml(ctx.zone)  + '">';
-    if (ctx.zone)  h += '<div style="margin-bottom:6px;font-size:0.85rem;color:var(--muted);">Zone: <strong>' + _escHtml(ctx.zone) + '</strong></div>';
+    if (ctx.ask === 'zone') {
+        h += _qcTextField('qcZone', 'Zone Name *', 'e.g. A');
+        h += '<input type="hidden" id="qcAisle" value="">';
+        h += '<input type="hidden" id="qcRack"  value="">';
+        h += '<input type="hidden" id="qcShelf" value="">';
+    } else {
+        h += '<input type="hidden" id="qcZone"  value="' + _escHtml(ctx.zone)  + '">';
+        if (ctx.zone)  h += '<div style="margin-bottom:6px;font-size:0.85rem;color:var(--muted);">Zone: <strong>' + _escHtml(ctx.zone) + '</strong></div>';
+    }
     if (ctx.ask === 'aisle') {
         h += _qcTextField('qcAisle', 'Aisle Name *', 'e.g. A1');
         h += '<input type="hidden" id="qcRack"  value="">';
         h += '<input type="hidden" id="qcShelf" value="">';
-    } else {
+    } else if (ctx.ask !== 'zone') {
         h += '<input type="hidden" id="qcAisle" value="' + _escHtml(ctx.aisle) + '">';
         if (ctx.aisle) h += '<div style="margin-bottom:6px;font-size:0.85rem;color:var(--muted);">Aisle: <strong>' + _escHtml(ctx.aisle) + '</strong></div>';
         if (ctx.ask === 'rack') {
