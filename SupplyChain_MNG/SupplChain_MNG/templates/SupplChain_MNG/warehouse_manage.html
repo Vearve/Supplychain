@@ -200,6 +200,12 @@
         <article class="metric"><div class="label">Moved Qty (Busiest Day)</div><div class="value">{{ warehouse_busiest_day_total|floatformat:2 }}</div></article>
     </section>
 
+    <section class="cards" style="margin-bottom: 12px;">
+        <article class="metric"><div class="label">Delivery Notes (Approved)</div><div class="value">{{ warehouse_dn_approved }}</div></article>
+        <article class="metric"><div class="label">Delivery Notes (Dispatched)</div><div class="value">{{ warehouse_dn_dispatched }}</div></article>
+        <article class="metric"><div class="label">Delivery Notes (Received)</div><div class="value">{{ warehouse_dn_received }}</div></article>
+    </section>
+
     <section class="split" style="margin-bottom: 12px;">
         <div class="panel panel-pad">
             <h3 style="margin-top: 0;">Stock In vs Stock Out</h3>
@@ -718,6 +724,9 @@
             <h3 style="margin: 0;">Recent Stock Movements</h3>
             <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
                 <span id="movFilterTag" style="display:none; font-size:0.78rem; color:var(--muted); border:1px solid var(--line); border-radius:999px; padding:3px 8px;">Chart filter active</span>
+                <input type="search" id="movDNFilter" placeholder="Filter by delivery note…"
+                    style="padding:6px 10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--text); font-size:0.88rem; width:180px;"
+                    oninput="applyMovementFilters()">
                 <input type="search" id="movSearch" placeholder="Filter material, type, store…"
                     style="padding:6px 10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--text); font-size:0.88rem; width:220px;"
                     oninput="setMovementSearch(this.value)">
@@ -744,7 +753,7 @@
             </thead>
             <tbody>
                 {% for mov in recent_movements %}
-                <tr data-mov-row="1" data-mov-direction="{{ mov.warehouse_direction|default:'' }}" data-mov-material="{{ mov.material.name|lower }}" data-mov-date="{{ mov.created_at|date:'Y-m-d' }}">
+                <tr data-mov-row="1" data-mov-direction="{{ mov.warehouse_direction|default:'' }}" data-mov-material="{{ mov.material.name|lower }}" data-mov-date="{{ mov.created_at|date:'Y-m-d' }}" data-mov-dn="{{ mov.delivery_note_number|lower|default:'' }}">
                     <td style="white-space:nowrap;">{{ mov.created_at|date:"d M Y H:i" }}</td>
                     <td>
                         {% if mov.movement_type == "RECEIPT" %}<span class="badge badge-ok">Receipt</span>
@@ -1903,17 +1912,21 @@ function clearMovementFilters() {
     _movementFilter = { query: '', direction: '', material: '', date: '' };
     var movSearch = document.getElementById('movSearch');
     if (movSearch) movSearch.value = '';
+    var movDN = document.getElementById('movDNFilter');
+    if (movDN) movDN.value = '';
     applyMovementFilters();
 }
 
 function applyMovementFilters() {
+    var dnFilter = (document.getElementById('movDNFilter') || {value: ''}).value.toLowerCase();
     var rows = document.querySelectorAll('#movTable tbody tr[data-mov-row="1"]');
     rows.forEach(function(row) {
         var textOk = !_movementFilter.query || row.textContent.toLowerCase().indexOf(_movementFilter.query) >= 0;
         var dirOk = !_movementFilter.direction || row.dataset.movDirection === _movementFilter.direction;
         var matOk = !_movementFilter.material || (row.dataset.movMaterial || '').indexOf(_movementFilter.material) >= 0;
         var dateOk = !_movementFilter.date || row.dataset.movDate === _movementFilter.date;
-        row.style.display = (textOk && dirOk && matOk && dateOk) ? '' : 'none';
+        var dnOk = !dnFilter || (row.dataset.movDn || '').indexOf(dnFilter) >= 0;
+        row.style.display = (textOk && dirOk && matOk && dateOk && dnOk) ? '' : 'none';
     });
 
     var isChartScoped = !!(_movementFilter.direction || _movementFilter.material || _movementFilter.date);

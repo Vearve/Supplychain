@@ -1326,6 +1326,12 @@ def warehouse_manage_view(request, pk):
         row.note_number: row.id
         for row in DeliveryNote.objects.filter(note_number__in=fallback_delivery_numbers).only("id", "note_number")
     }
+    warehouse_delivery_notes_qs = DeliveryNote.objects.filter(
+        source_requisition__project__store_locations__warehouse=warehouse
+    ).distinct()
+    dn_approved_count = warehouse_delivery_notes_qs.filter(status="APPROVED").count()
+    dn_dispatched_count = warehouse_delivery_notes_qs.filter(status="DISPATCHED").count()
+    dn_received_count = warehouse_delivery_notes_qs.filter(status="RECEIVED").count()
     for mov in recent_movements:
         from_here = mov.from_store_id in wh_store_ids if mov.from_store_id else False
         to_here = mov.to_store_id in wh_store_ids if mov.to_store_id else False
@@ -1772,6 +1778,9 @@ def warehouse_manage_view(request, pk):
             "warehouse_busiest_material_total": float((busiest_material["total_moved"] if busiest_material else 0) or 0),
             "warehouse_busiest_day": (busiest_day["date"] if busiest_day else "—"),
             "warehouse_busiest_day_total": float(busiest_day_total or 0),
+            "warehouse_dn_approved": dn_approved_count,
+            "warehouse_dn_dispatched": dn_dispatched_count,
+            "warehouse_dn_received": dn_received_count,
             "recent_movements": recent_movements,
             "all_materials_json": json.dumps(all_materials),
             "alloc_store_rows": alloc_store_rows,
