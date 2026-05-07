@@ -149,6 +149,7 @@ def _collect_filters(request):
         "code_number": request.GET.get("code_number", "").strip(),
         "part_number": request.GET.get("part_number", "").strip(),
         "category": request.GET.get("category", "").strip(),
+        "status": request.GET.get("status", "").strip().upper(),
         "period": request.GET.get("period", "30d").strip() or "30d",
     }
 
@@ -188,6 +189,8 @@ def _filtered_querysets(request):
         requisitions = requisitions.filter(material__category_id=filters["category"])
         returns = returns.filter(material__category_id=filters["category"])
         transactions = transactions.filter(material__category_id=filters["category"])
+    if filters["status"] in {"DRAFT", "SUBMITTED", "VALIDATED", "APPROVED", "REJECTED", "FULFILLED"}:
+        requisitions = requisitions.filter(status=filters["status"])
 
     period_start = _period_start(filters["period"])
     if period_start:
@@ -1151,6 +1154,18 @@ def requisitions_view(request):
         req_qs = req_qs.filter(project=project_context)
 
     rows = list(req_qs)
+    dn_counts = dict(
+        DeliveryNote.objects.filter(source_requisition_id__in=[row.id for row in rows])
+        .values("source_requisition_id")
+        .annotate(total=Count("id"))
+        .values_list("source_requisition_id", "total")
+    )
+
+    pending_count = 0
+    overdue_count = 0
+    total_requested = Decimal("0.00")
+    total_fulfilled = Decimal("0.00")
+    now_ts = timezone.now()
 
     for req in rows:
         line_items = list(req.items.all())
@@ -1160,10 +1175,23 @@ def requisitions_view(request):
         else:
             req.line_count = 1 if req.material else 0
             req.total_qty = Decimal(str(req.quantity_requested or 0))
-    req.fulfillment_pct = req.fulfillment_percentage
-    req.sla_status = req.sla_status
-    req.days_pending = req.days_pending
-    req.linked_dn_count = req.get_linked_delivery_notes().count()
+
+        req.fulfillment_pct = req.fulfillment_percentage
+        req.sla_state = req.sla_status
+        req.pending_days = req.days_pending
+        req.linked_dn_count = dn_counts.get(req.id, 0)
+
+        if req.status in {"SUBMITTED", "VALIDATED", "APPROVED"}:
+            pending_count += 1
+        if req.sla_deadline and (not req.fulfilled) and req.sla_deadline < now_ts:
+            overdue_count += 1
+
+        total_requested += req.total_qty
+        total_fulfilled += Decimal(str(req.quantity_fulfilled or 0))
+
+    fulfillment_total_pct = 0.0
+    if total_requested > 0:
+        fulfillment_total_pct = float((total_fulfilled / total_requested) * 100)
 
     unread_ids = list(
         Requisition.objects.exclude(requested_by=request.user)
@@ -1179,6 +1207,11 @@ def requisitions_view(request):
     context["rows"] = rows
     context["project_context"] = project_context
     context["unread_requisitions_count"] = 0
+    context["active_status_filter"] = context["filters"].get("status", "")
+    context["req_draft_count"] = len([r for r in rows if r.status == "DRAFT"])
+    context["req_pending_count"] = pending_count
+    context["req_overdue_count"] = overdue_count
+    context["req_fulfillment_total_pct"] = fulfillment_total_pct
     return render(request, "SupplChain_MNG/requisitions.html", context)
 
 

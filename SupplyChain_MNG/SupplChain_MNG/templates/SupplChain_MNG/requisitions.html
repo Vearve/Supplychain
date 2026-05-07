@@ -16,6 +16,25 @@
     <a class="btn btn-neutral" href="{% url 'export_records' 'requisitions' 'csv' %}?{{ request.GET.urlencode }}">Export CSV</a>
     <a class="btn btn-neutral" href="{% url 'export_records' 'requisitions' 'excel' %}?{{ request.GET.urlencode }}">Export Excel</a>
 </div>
+
+<section class="cards" style="margin-bottom: 12px;">
+    <article class="metric"><div class="label">Draft</div><div class="value">{{ req_draft_count }}</div></article>
+    <article class="metric"><div class="label">Pending Action</div><div class="value">{{ req_pending_count }}</div></article>
+    <article class="metric"><div class="label">Overdue SLA</div><div class="value">{{ req_overdue_count }}</div></article>
+    <article class="metric"><div class="label">Fulfillment (Overall)</div><div class="value">{{ req_fulfillment_total_pct|floatformat:1 }}%</div></article>
+</section>
+
+<div class="panel panel-pad" style="margin-bottom: 12px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+    <span style="font-size:0.86rem; color:var(--muted);">Status filter:</span>
+    <a class="btn btn-sm {% if not active_status_filter %}btn-primary{% else %}btn-neutral{% endif %}" href="{% url 'requisitions' %}{% if project_context %}?project={{ project_context.id }}{% endif %}">All</a>
+    <a class="btn btn-sm {% if active_status_filter == 'DRAFT' %}btn-primary{% else %}btn-neutral{% endif %}" href="{% url 'requisitions' %}?status=DRAFT{% if project_context %}&project={{ project_context.id }}{% endif %}">Draft</a>
+    <a class="btn btn-sm {% if active_status_filter == 'SUBMITTED' %}btn-primary{% else %}btn-neutral{% endif %}" href="{% url 'requisitions' %}?status=SUBMITTED{% if project_context %}&project={{ project_context.id }}{% endif %}">Submitted</a>
+    <a class="btn btn-sm {% if active_status_filter == 'VALIDATED' %}btn-primary{% else %}btn-neutral{% endif %}" href="{% url 'requisitions' %}?status=VALIDATED{% if project_context %}&project={{ project_context.id }}{% endif %}">Validated</a>
+    <a class="btn btn-sm {% if active_status_filter == 'APPROVED' %}btn-primary{% else %}btn-neutral{% endif %}" href="{% url 'requisitions' %}?status=APPROVED{% if project_context %}&project={{ project_context.id }}{% endif %}">Approved</a>
+    <a class="btn btn-sm {% if active_status_filter == 'FULFILLED' %}btn-primary{% else %}btn-neutral{% endif %}" href="{% url 'requisitions' %}?status=FULFILLED{% if project_context %}&project={{ project_context.id }}{% endif %}">Fulfilled</a>
+    <a class="btn btn-sm {% if active_status_filter == 'REJECTED' %}btn-primary{% else %}btn-neutral{% endif %}" href="{% url 'requisitions' %}?status=REJECTED{% if project_context %}&project={{ project_context.id }}{% endif %}">Rejected</a>
+</div>
+
 <div class="panel panel-pad table-wrap">
     <table>
         <thead>
@@ -45,11 +64,11 @@
                 </td>
                                 <td>{{ item.fulfillment_pct|floatformat:0 }}%</td>
                                 <td>
-                                    {% if item.sla_status == 'on-time' %}<span class="badge badge-ok">On-Time</span>
-                                    {% elif item.sla_status == 'overdue' %}<span class="badge badge-danger">Overdue</span>
+                                    {% if item.sla_state == 'on-time' %}<span class="badge badge-ok">On-Time</span>
+                                    {% elif item.sla_state == 'overdue' %}<span class="badge badge-danger">Overdue</span>
                                     {% else %}<span class="badge badge-neutral">No Deadline</span>{% endif %}
                                 </td>
-                                <td>{{ item.days_pending }} days</td>
+                                <td>{{ item.pending_days }} days</td>
                                 <td>{{ item.linked_dn_count }}</td>
                 <td>
                     <a class="btn btn-neutral btn-sm" href="{% url 'requisition_detail' item.id %}{% if project_context %}?project={{ project_context.id }}{% endif %}">View</a>
