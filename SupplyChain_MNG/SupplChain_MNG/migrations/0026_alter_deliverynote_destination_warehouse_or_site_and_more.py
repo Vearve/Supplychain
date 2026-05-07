@@ -4,12 +4,75 @@ import django.db.models.deletion
 from django.db import migrations, models
 
 
+def _normalize_store_location_refs(apps, schema_editor):
+    DeliveryNote = apps.get_model("SupplChain_MNG", "DeliveryNote")
+    StoreLocation = apps.get_model("SupplChain_MNG", "StoreLocation")
+    db_alias = schema_editor.connection.alias
+
+    store_lookup = {}
+    for store in StoreLocation.objects.using(db_alias).select_related("warehouse", "project").order_by("id"):
+        candidates = [store.name]
+        if store.warehouse_id and getattr(store.warehouse, "name", None):
+            candidates.append(store.warehouse.name)
+        if store.project_id and getattr(store.project, "name", None):
+            candidates.append(store.project.name)
+
+        for candidate in candidates:
+            if not candidate:
+                continue
+            key = candidate.strip().casefold()
+            if key and key not in store_lookup:
+                store_lookup[key] = str(store.pk)
+
+    for note in DeliveryNote.objects.using(db_alias).all().iterator():
+        updates = {}
+        for field_name in ("source_warehouse_or_site", "destination_warehouse_or_site"):
+            raw_value = getattr(note, field_name, None)
+            if raw_value is None:
+                continue
+
+            text_value = str(raw_value).strip()
+            if not text_value:
+                updates[field_name] = None
+                continue
+
+            if text_value.isdigit() and StoreLocation.objects.using(db_alias).filter(pk=int(text_value)).exists():
+                updates[field_name] = text_value
+                continue
+
+            updates[field_name] = store_lookup.get(text_value.casefold())
+
+        if updates:
+            DeliveryNote.objects.using(db_alias).filter(pk=note.pk).update(**updates)
+
+
 class Migration(migrations.Migration):
     dependencies = [
         ("SupplChain_MNG", "0025_deliverynote_destination_warehouse_or_site_and_more"),
     ]
 
     operations = [
+        migrations.AlterField(
+            model_name="deliverynote",
+            name="destination_warehouse_or_site",
+            field=models.CharField(
+                blank=True,
+                help_text="Select destination warehouse or project/site store",
+                max_length=150,
+                null=True,
+            ),
+        ),
+        migrations.AlterField(
+            model_name="deliverynote",
+            name="source_warehouse_or_site",
+            field=models.CharField(
+                blank=True,
+                help_text="Select source warehouse or project/site store",
+                max_length=150,
+                null=True,
+            ),
+        ),
+        migrations.RunPython(_normalize_store_location_refs, migrations.RunPython.noop),
         migrations.AlterField(
             model_name="deliverynote",
             name="destination_warehouse_or_site",

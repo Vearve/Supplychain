@@ -4,6 +4,60 @@ import django.db.models.deletion
 from django.db import migrations, models
 
 
+def _normalize_fleet_refs(apps, schema_editor):
+    DeliveryNote = apps.get_model("SupplChain_MNG", "DeliveryNote")
+    Driver = apps.get_model("SupplChain_MNG", "Driver")
+    MobileEquipment = apps.get_model("SupplChain_MNG", "MobileEquipment")
+    db_alias = schema_editor.connection.alias
+
+    driver_lookup = {}
+    for driver in Driver.objects.using(db_alias).all().order_by("id"):
+        for candidate in (driver.full_name, getattr(driver, "license_number", None)):
+            if not candidate:
+                continue
+            key = candidate.strip().casefold()
+            if key and key not in driver_lookup:
+                driver_lookup[key] = str(driver.pk)
+
+    equipment_lookup = {}
+    for equipment in MobileEquipment.objects.using(db_alias).all().order_by("id"):
+        candidates = [equipment.name, equipment.registration_number]
+        if equipment.name and equipment.registration_number:
+            candidates.append(f"{equipment.name} ({equipment.registration_number})")
+        for candidate in candidates:
+            if not candidate:
+                continue
+            key = candidate.strip().casefold()
+            if key and key not in equipment_lookup:
+                equipment_lookup[key] = str(equipment.pk)
+
+    for note in DeliveryNote.objects.using(db_alias).all().iterator():
+        updates = {}
+
+        raw_driver = getattr(note, "driver", None)
+        if raw_driver is not None:
+            driver_text = str(raw_driver).strip()
+            if not driver_text:
+                updates["driver"] = None
+            elif driver_text.isdigit() and Driver.objects.using(db_alias).filter(pk=int(driver_text)).exists():
+                updates["driver"] = driver_text
+            else:
+                updates["driver"] = driver_lookup.get(driver_text.casefold())
+
+        raw_equipment = getattr(note, "mobile_equipment", None)
+        if raw_equipment is not None:
+            equipment_text = str(raw_equipment).strip()
+            if not equipment_text:
+                updates["mobile_equipment"] = None
+            elif equipment_text.isdigit() and MobileEquipment.objects.using(db_alias).filter(pk=int(equipment_text)).exists():
+                updates["mobile_equipment"] = equipment_text
+            else:
+                updates["mobile_equipment"] = equipment_lookup.get(equipment_text.casefold())
+
+        if updates:
+            DeliveryNote.objects.using(db_alias).filter(pk=note.pk).update(**updates)
+
+
 class Migration(migrations.Migration):
     dependencies = [
         (
@@ -13,6 +67,27 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        migrations.AlterField(
+            model_name="deliverynote",
+            name="driver",
+            field=models.CharField(
+                blank=True,
+                help_text="Select a driver from fleet management",
+                max_length=120,
+                null=True,
+            ),
+        ),
+        migrations.AlterField(
+            model_name="deliverynote",
+            name="mobile_equipment",
+            field=models.CharField(
+                blank=True,
+                help_text="Select vehicle/equipment from fleet management",
+                max_length=120,
+                null=True,
+            ),
+        ),
+        migrations.RunPython(_normalize_fleet_refs, migrations.RunPython.noop),
         migrations.AlterField(
             model_name="deliverynote",
             name="driver",
