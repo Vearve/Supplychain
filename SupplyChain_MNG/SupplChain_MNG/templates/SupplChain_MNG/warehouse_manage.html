@@ -185,6 +185,7 @@
                     <td>
                         <a class="btn btn-neutral btn-sm" href="{% url 'record_update' 'store-locations' item.id %}">Edit</a>
                         <a class="btn btn-primary btn-sm" href="{% url 'goods_received_create' %}?store={{ item.id }}">Stock In</a>
+                        <a class="btn btn-primary btn-sm" href="{% url 'goods_issue_create' %}?store={{ item.id }}">Stock Out</a>
                     </td>
                 </tr>
                 {% empty %}
@@ -661,6 +662,12 @@
      TAB 4 — MOVEMENTS
      ══════════════════════════════════ -->
 <div id="tab-movements" class="wh-tab-panel">
+    <section class="cards" style="margin-bottom: 12px;">
+        <article class="metric"><div class="label">Inbound</div><div class="value">{{ warehouse_inbound_movement_count }}</div></article>
+        <article class="metric"><div class="label">Outbound</div><div class="value">{{ warehouse_outbound_movement_count }}</div></article>
+        <article class="metric"><div class="label">Internal</div><div class="value">{{ warehouse_internal_movement_count }}</div></article>
+        <article class="metric"><div class="label">Recent Logged</div><div class="value">{{ recent_movements|length }}</div></article>
+    </section>
     <section class="panel panel-pad table-wrap" style="margin-bottom: 12px;">
         <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:10px;">
             <h3 style="margin: 0;">Recent Stock Movements</h3>
@@ -673,8 +680,10 @@
                 <tr>
                     <th>Date / Time</th>
                     <th>Type</th>
+                    <th>Warehouse Flow</th>
                     <th>Material</th>
                     <th>Qty</th>
+                    <th>Counterparty</th>
                     <th>From Store</th>
                     <th>From Bin</th>
                     <th>To Store</th>
@@ -695,8 +704,18 @@
                         {% else %}<span class="badge badge-neutral">{{ mov.movement_type }}</span>
                         {% endif %}
                     </td>
+                    <td>
+                        {% if mov.warehouse_direction == "inbound" %}
+                        <span class="badge badge-ok">Inbound</span>
+                        {% elif mov.warehouse_direction == "outbound" %}
+                        <span class="badge badge-warn">Outbound</span>
+                        {% else %}
+                        <span class="badge badge-neutral">Internal</span>
+                        {% endif %}
+                    </td>
                     <td>{{ mov.material.name }}</td>
                     <td>{{ mov.quantity }}</td>
+                    <td>{{ mov.counterparty_label|default:"—" }}</td>
                     <td>{{ mov.from_store.name|default:"—" }}</td>
                     <td>{{ mov.from_bin.bin_code|default:"—" }}</td>
                     <td>{{ mov.to_store.name|default:"—" }}</td>
@@ -705,7 +724,7 @@
                     <td style="font-size:0.82rem;">{{ mov.created_by.get_full_name|default:mov.created_by.username|default:"—" }}</td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="10" style="color:var(--muted);">No stock movements recorded for this warehouse yet.</td></tr>
+                <tr><td colspan="12" style="color:var(--muted);">No stock movements recorded for this warehouse yet.</td></tr>
                 {% endfor %}
             </tbody>
         </table>

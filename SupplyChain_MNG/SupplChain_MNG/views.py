@@ -1306,6 +1306,24 @@ def warehouse_manage_view(request, pk):
         .filter(Q(from_store_id__in=wh_store_ids) | Q(to_store_id__in=wh_store_ids))
         .order_by("-created_at")[:50]
     )
+    inbound_movement_count = 0
+    outbound_movement_count = 0
+    internal_movement_count = 0
+    for mov in recent_movements:
+        from_here = mov.from_store_id in wh_store_ids if mov.from_store_id else False
+        to_here = mov.to_store_id in wh_store_ids if mov.to_store_id else False
+        if from_here and to_here:
+            mov.warehouse_direction = "internal"
+            mov.counterparty_label = mov.to_store.name if mov.to_store else "Internal transfer"
+            internal_movement_count += 1
+        elif to_here:
+            mov.warehouse_direction = "inbound"
+            mov.counterparty_label = mov.from_store.name if mov.from_store else "External source"
+            inbound_movement_count += 1
+        else:
+            mov.warehouse_direction = "outbound"
+            mov.counterparty_label = mov.to_store.name if mov.to_store else "External destination"
+            outbound_movement_count += 1
 
     linked_projects = list(
         Project.objects.filter(store_locations__warehouse=warehouse).distinct().order_by("name")
@@ -1618,6 +1636,9 @@ def warehouse_manage_view(request, pk):
             "warehouse_stock_qty": balances_qs.aggregate(total=Sum("on_hand"))["total"] or 0,
             "warehouse_pending_requisitions": sum([item["pending_requisitions"] for item in project_cards]),
             "warehouse_returned_goods_qty": sum([item["returned_goods_qty"] for item in project_cards]),
+            "warehouse_inbound_movement_count": inbound_movement_count,
+            "warehouse_outbound_movement_count": outbound_movement_count,
+            "warehouse_internal_movement_count": internal_movement_count,
             "recent_movements": recent_movements,
             "all_materials_json": json.dumps(all_materials),
             "alloc_store_rows": alloc_store_rows,
@@ -2318,6 +2339,10 @@ def goods_issue_create_view(request):
     formset = GoodsIssueItemFormSet(request.POST or None, instance=issue, prefix="items")
 
     project, project_stores_qs, project_store_ids = _project_store_context(request)
+    selected_store_param = (request.GET.get("store") or "").strip()
+    selected_store_qs = StoreLocation.objects.filter(pk=selected_store_param) if selected_store_param else StoreLocation.objects.none()
+    selected_store_qs = _filter_by_store_scope(selected_store_qs, request.user, "id")
+    selected_store = selected_store_qs.first() if selected_store_param else None
     if project:
         form.fields["source_store"].queryset = project_stores_qs
         form.fields["source_bin"].queryset = StorageBin.objects.filter(store_location_id__in=project_store_ids).order_by(
@@ -2325,6 +2350,21 @@ def goods_issue_create_view(request):
         )
         if request.method == "GET" and len(project_store_ids) == 1:
             form.fields["source_store"].initial = project_store_ids[0]
+
+    if selected_store:
+        form.fields["source_store"].queryset = StoreLocation.objects.filter(pk=selected_store.pk)
+        form.fields["source_store"].initial = selected_store.pk
+        form.fields["source_bin"].queryset = StorageBin.objects.filter(
+            store_location=selected_store,
+            is_active=True,
+        ).order_by("bin_code")
+
+    selected_store_id = request.POST.get("source_store") if request.method == "POST" else form.initial.get("source_store")
+    if selected_store_id:
+        form.fields["source_bin"].queryset = StorageBin.objects.filter(
+            store_location_id=selected_store_id,
+            is_active=True,
+        ).order_by("bin_code")
 
     if request.method == "POST" and form.is_valid() and formset.is_valid():
         issue = form.save(commit=False)
