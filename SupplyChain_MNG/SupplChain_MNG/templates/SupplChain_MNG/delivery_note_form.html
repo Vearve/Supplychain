@@ -7,18 +7,103 @@
 <div class="panel panel-pad" style="max-width: 980px; margin-bottom: 12px;">
     <form method="post" enctype="multipart/form-data" id="delivery-note-form">
         {% csrf_token %}
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
-            {% for field in form %}
-            {% if field.name == 'notes' %}
-            <div style="grid-column:1 / -1;">
-            {% else %}
+
+        <!-- Basic Information Section -->
+        <h3 style="margin-top:0; margin-bottom:12px;">Delivery Note Header</h3>
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-bottom:16px;">
             <div>
-            {% endif %}
-                <label style="font-size:0.9rem; font-weight:600; display:block; margin-bottom:4px;">{{ field.label }}</label>
-                {{ field }}
-                {% for error in field.errors %}<div style="color:#b21f35; font-size:0.85rem;">{{ error }}</div>{% endfor %}
+                <label style="font-size:0.9rem; font-weight:600; display:block; margin-bottom:4px;">{{ form.date_issued.label }}</label>
+                {{ form.date_issued }}
+                {% for error in form.date_issued.errors %}<div style="color:#b21f35; font-size:0.85rem;">{{ error }}</div>{% endfor %}
             </div>
-            {% endfor %}
+            <div>
+                <label style="font-size:0.9rem; font-weight:600; display:block; margin-bottom:4px;">{{ form.source_requisition.label }}</label>
+                {{ form.source_requisition }}
+                {% for error in form.source_requisition.errors %}<div style="color:#b21f35; font-size:0.85rem;">{{ error }}</div>{% endfor %}
+            </div>
+            <div>
+                <label style="font-size:0.9rem; font-weight:600; display:block; margin-bottom:4px;">{{ form.transfer_type.label }}</label>
+                {{ form.transfer_type }}
+                {% for error in form.transfer_type.errors %}<div style="color:#b21f35; font-size:0.85rem;">{{ error }}</div>{% endfor %}
+            </div>
+        </div>
+
+        <!-- Location Details Section -->
+        <h3 style="margin-bottom:12px;">Location Details</h3>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px;">
+            <div>
+                <label style="font-size:0.9rem; font-weight:600; display:block; margin-bottom:4px;">{{ form.source_warehouse_or_site.label }}</label>
+                {{ form.source_warehouse_or_site }}
+                {% for error in form.source_warehouse_or_site.errors %}<div style="color:#b21f35; font-size:0.85rem;">{{ error }}</div>{% endfor %}
+            </div>
+            <div>
+                <label style="font-size:0.9rem; font-weight:600; display:block; margin-bottom:4px;">{{ form.destination_warehouse_or_site.label }}</label>
+                {{ form.destination_warehouse_or_site }}
+                {% for error in form.destination_warehouse_or_site.errors %}<div style="color:#b21f35; font-size:0.85rem;">{{ error }}</div>{% endfor %}
+            </div>
+            <div>
+                <label style="font-size:0.9rem; font-weight:600; display:block; margin-bottom:4px;">{{ form.from_location.label }}</label>
+                {{ form.from_location }}
+                {% for error in form.from_location.errors %}<div style="color:#b21f35; font-size:0.85rem;">{{ error }}</div>{% endfor %}
+            </div>
+            <div>
+                <label style="font-size:0.9rem; font-weight:600; display:block; margin-bottom:4px;">{{ form.to_location.label }}</label>
+                {{ form.to_location }}
+                {% for error in form.to_location.errors %}<div style="color:#b21f35; font-size:0.85rem;">{{ error }}</div>{% endfor %}
+            </div>
+        </div>
+
+        <!-- Transport Details Section -->
+        <h3 style="margin-bottom:12px;">Transport & Reference</h3>
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-bottom:16px;">
+            <div>
+                <label style="font-size:0.9rem; font-weight:600; display:block; margin-bottom:4px;">{{ form.driver.label }}</label>
+                {{ form.driver }}
+                {% for error in form.driver.errors %}<div style="color:#b21f35; font-size:0.85rem;">{{ error }}</div>{% endfor %}
+            </div>
+            <div>
+                <label style="font-size:0.9rem; font-weight:600; display:block; margin-bottom:4px;">{{ form.mobile_equipment.label }}</label>
+                {{ form.mobile_equipment }}
+                {% for error in form.mobile_equipment.errors %}<div style="color:#b21f35; font-size:0.85rem;">{{ error }}</div>{% endfor %}
+            </div>
+            <div>
+                <label style="font-size:0.9rem; font-weight:600; display:block; margin-bottom:4px;">{{ form.reference_type.label }}</label>
+                {{ form.reference_type }}
+                {% for error in form.reference_type.errors %}<div style="color:#b21f35; font-size:0.85rem;">{{ error }}</div>{% endfor %}
+            </div>
+            <div>
+                <label style="font-size:0.9rem; font-weight:600; display:block; margin-bottom:4px;">{{ form.reference_number.label }}</label>
+                {{ form.reference_number }}
+                {% for error in form.reference_number.errors %}<div style="color:#b21f35; font-size:0.85rem;">{{ error }}</div>{% endfor %}
+            </div>
+        </div>
+
+        <!-- Personnel Section -->
+        <h3 style="margin-bottom:12px;">Personnel</h3>
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-bottom:16px;">
+            <div>
+                <label style="font-size:0.9rem; font-weight:600; display:block; margin-bottom:4px;">{{ form.prepared_by.label }}</label>
+                {{ form.prepared_by }}
+                {% for error in form.prepared_by.errors %}<div style="color:#b21f35; font-size:0.85rem;">{{ error }}</div>{% endfor %}
+            </div>
+            <div>
+                <label style="font-size:0.9rem; font-weight:600; display:block; margin-bottom:4px;">{{ form.delivered_by.label }}</label>
+                {{ form.delivered_by }}
+                {% for error in form.delivered_by.errors %}<div style="color:#b21f35; font-size:0.85rem;">{{ error }}</div>{% endfor %}
+            </div>
+            <div>
+                <label style="font-size:0.9rem; font-weight:600; display:block; margin-bottom:4px;">{{ form.received_by.label }}</label>
+                {{ form.received_by }}
+                {% for error in form.received_by.errors %}<div style="color:#b21f35; font-size:0.85rem;">{{ error }}</div>{% endfor %}
+            </div>
+        </div>
+
+        <!-- Notes Section -->
+        <h3 style="margin-bottom:12px;">Notes</h3>
+        <div style="margin-bottom:16px;">
+            <label style="font-size:0.9rem; font-weight:600; display:block; margin-bottom:4px;">{{ form.notes.label }}</label>
+            {{ form.notes }}
+            {% for error in form.notes.errors %}<div style="color:#b21f35; font-size:0.85rem;">{{ error }}</div>{% endfor %}
         </div>
 
         <hr style="margin:16px 0; border:none; border-top:1px solid #d4dfe7;">

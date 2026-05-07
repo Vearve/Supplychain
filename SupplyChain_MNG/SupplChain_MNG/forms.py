@@ -482,6 +482,13 @@ class DeliveryNoteForm(forms.ModelForm):
             "source_requisition",
             "from_location",
             "to_location",
+            "transfer_type",
+            "source_warehouse_or_site",
+            "destination_warehouse_or_site",
+            "driver",
+            "mobile_equipment",
+            "reference_type",
+            "reference_number",
             "prepared_by",
             "delivered_by",
             "received_by",
@@ -494,6 +501,13 @@ class DeliveryNoteForm(forms.ModelForm):
             "source_requisition": "Linked Requisition (optional)",
             "from_location": "From Address",
             "to_location": "To Address",
+            "transfer_type": "Transfer Type",
+            "source_warehouse_or_site": "Source Warehouse/Site",
+            "destination_warehouse_or_site": "Destination Warehouse/Site",
+            "driver": "Driver Name",
+            "mobile_equipment": "Mobile Equipment/Vehicle",
+            "reference_type": "Reference Type",
+            "reference_number": "Reference Number",
         }
 
 

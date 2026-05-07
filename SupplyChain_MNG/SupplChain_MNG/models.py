@@ -634,6 +634,14 @@ class DeliveryNote(models.Model):
         ("RECEIVED", "Received"),
         ("CANCELLED", "Cancelled"),
     ]
+    TRANSFER_TYPE_CHOICES = [
+        ("WAREHOUSE_TO_SITE", "Warehouse to Site"),
+        ("SITE_TO_WAREHOUSE", "Site to Warehouse"),
+        ("SITE_TO_SITE", "Site to Site"),
+        ("WAREHOUSE_TO_WAREHOUSE", "Warehouse to Warehouse"),
+        ("INTERNAL", "Internal Transfer"),
+        ("OTHER", "Other"),
+    ]
 
     note_number = models.CharField(max_length=20, unique=True, blank=True)
     date_issued = models.DateField(default=timezone.localdate)
@@ -669,6 +677,13 @@ class DeliveryNote(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    driver = models.CharField(max_length=120, blank=True, help_text="Name of the driver transporting goods")
+    mobile_equipment = models.CharField(max_length=120, blank=True, help_text="Vehicle registration, asset tag, or equipment ID")
+    reference_type = models.CharField(max_length=50, blank=True, help_text="Type of reference (e.g., PO, Invoice, Work Order)")
+    reference_number = models.CharField(max_length=50, blank=True, help_text="Reference document number")
+    transfer_type = models.CharField(max_length=30, choices=TRANSFER_TYPE_CHOICES, blank=True, help_text="Type of transfer being performed")
+    source_warehouse_or_site = models.CharField(max_length=150, blank=True, help_text="Name of source warehouse or project/site")
+    destination_warehouse_or_site = models.CharField(max_length=150, blank=True, help_text="Name of destination warehouse or project/site")
     notes = models.TextField(blank=True)
 
     class Meta:
