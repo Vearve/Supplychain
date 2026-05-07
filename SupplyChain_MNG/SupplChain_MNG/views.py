@@ -1306,6 +1306,9 @@ def warehouse_manage_view(request, pk):
         .filter(Q(from_store_id__in=wh_store_ids) | Q(to_store_id__in=wh_store_ids))
         .order_by("-created_at")[:50]
     )
+    warehouse_movements_qs = InventoryMovement.objects.select_related(
+        "material", "from_store", "to_store", "from_bin", "to_bin", "created_by"
+    ).filter(Q(from_store_id__in=wh_store_ids) | Q(to_store_id__in=wh_store_ids))
     inbound_movement_count = 0
     outbound_movement_count = 0
     internal_movement_count = 0
@@ -1324,6 +1327,16 @@ def warehouse_manage_view(request, pk):
             mov.warehouse_direction = "outbound"
             mov.counterparty_label = mov.to_store.name if mov.to_store else "External destination"
             outbound_movement_count += 1
+
+    stock_in_total = warehouse_movements_qs.filter(to_store_id__in=wh_store_ids).aggregate(total=Sum("quantity"))["total"] or 0
+    stock_out_total = warehouse_movements_qs.filter(from_store_id__in=wh_store_ids).aggregate(total=Sum("quantity"))["total"] or 0
+    movement_material_trend = list(
+        warehouse_movements_qs
+        .filter(from_store_id__in=wh_store_ids)
+        .values("material__name")
+        .annotate(total=Sum("quantity"))
+        .order_by("-total")[:8]
+    )
 
     linked_projects = list(
         Project.objects.filter(store_locations__warehouse=warehouse).distinct().order_by("name")
@@ -1639,6 +1652,16 @@ def warehouse_manage_view(request, pk):
             "warehouse_inbound_movement_count": inbound_movement_count,
             "warehouse_outbound_movement_count": outbound_movement_count,
             "warehouse_internal_movement_count": internal_movement_count,
+            "warehouse_stock_in_total": stock_in_total,
+            "warehouse_stock_out_total": stock_out_total,
+            "warehouse_stock_split_json": json.dumps([
+                {"label": "Stock In", "total": float(stock_in_total)},
+                {"label": "Stock Out", "total": float(stock_out_total)},
+            ]),
+            "warehouse_material_trend_json": json.dumps([
+                {"name": row["material__name"] or "Unknown", "total": float(row["total"] or 0)}
+                for row in movement_material_trend
+            ]),
             "recent_movements": recent_movements,
             "all_materials_json": json.dumps(all_materials),
             "alloc_store_rows": alloc_store_rows,

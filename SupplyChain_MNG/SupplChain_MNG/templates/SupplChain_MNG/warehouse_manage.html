@@ -3,6 +3,10 @@
 {% block title %}Manage Warehouse{% endblock %}
 {% block page_title %}Warehouse: {{ warehouse.name }}{% endblock %}
 
+{% block head_extra %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% endblock %}
+
 {% block content %}
 <span id="wh-config" data-pk="{{ warehouse.pk }}" hidden></span>
 <style>
@@ -152,8 +156,15 @@
 
 <div class="panel panel-pad" style="margin-bottom: 12px; display: flex; gap: 8px; flex-wrap: wrap;">
     <a class="btn btn-neutral" href="{% url 'warehouse_management' %}">← Back to Warehouses</a>
-    <a class="btn btn-primary" href="{% url 'goods_received_create' %}">Stock In</a>
-    <a class="btn btn-primary" href="{% url 'goods_issue_create' %}">Stock Out</a>
+    {% if store_rows|length == 1 %}
+    {% for item in store_rows %}
+    <a class="btn btn-primary" href="{% url 'goods_received_create' %}?store={{ item.id }}">Stock In</a>
+    <a class="btn btn-primary" href="{% url 'goods_issue_create' %}?store={{ item.id }}">Stock Out</a>
+    {% endfor %}
+    {% else %}
+    <button type="button" class="btn btn-primary" onclick="openStockActionModal('in')">Stock In</button>
+    <button type="button" class="btn btn-primary" onclick="openStockActionModal('out')">Stock Out</button>
+    {% endif %}
     <a class="btn btn-primary" href="{% url 'warehouse_transfer_preset' %}">Warehouse → Site Transfer</a>
     <a class="btn btn-neutral" href="{% url 'inventory_management' %}">Inventory Setup</a>
 </div>
@@ -171,6 +182,17 @@
      TAB 1 — OVERVIEW
      ══════════════════════════════════ -->
 <div id="tab-overview" class="wh-tab-panel active">
+    <section class="split" style="margin-bottom: 12px;">
+        <div class="panel panel-pad">
+            <h3 style="margin-top: 0;">Stock In vs Stock Out</h3>
+            <canvas id="warehouseSplitChart" height="150"></canvas>
+        </div>
+        <div class="panel panel-pad">
+            <h3 style="margin-top: 0;">Most Moved Materials</h3>
+            <canvas id="warehouseTrendChart" height="150"></canvas>
+        </div>
+    </section>
+
     <section class="panel panel-pad table-wrap" style="margin-bottom: 12px;">
         <h3 style="margin-top: 0;">Store Locations In {{ warehouse.name }}</h3>
         <table>
@@ -789,6 +811,27 @@
     </section>
 </div><!-- /tab-presets -->
 
+<!-- ── Stock Action Modal ─────────────────────────────────────────────── -->
+<div id="stockActionModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.42); z-index:9040; align-items:center; justify-content:center;">
+    <div style="background:var(--card); border:1px solid var(--line); border-radius:14px; padding:20px; width:100%; max-width:400px; box-shadow:0 8px 32px rgba(0,0,0,0.24);">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+            <h4 id="stockActionTitle" style="margin:0; font-size:1rem;">Select Store</h4>
+            <button type="button" onclick="closeStockActionModal()" style="background:none; border:none; font-size:1.2rem; cursor:pointer; color:var(--muted);">✕</button>
+        </div>
+        <div style="margin-bottom:12px; color:var(--muted); font-size:0.88rem;">Choose the warehouse store to use for this action.</div>
+        <select id="stockActionStore" style="width:100%; padding:8px 10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--text); font-size:0.9rem; margin-bottom:14px;">
+            <option value="">— Select store —</option>
+            {% for item in store_rows %}
+            <option value="{{ item.id }}">{{ item.name }}</option>
+            {% endfor %}
+        </select>
+        <div style="display:flex; gap:8px; justify-content:flex-end;">
+            <button type="button" class="btn btn-neutral" onclick="closeStockActionModal()">Cancel</button>
+            <button type="button" class="btn btn-primary" onclick="goStockAction()">Continue</button>
+        </div>
+    </div>
+</div>
+
 <!-- ── Allocation Modal ── -->
 <div id="allocModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:9000; align-items:center; justify-content:center;">
     <div style="background:var(--card); border:1px solid var(--line); border-radius:16px; padding:24px; width:100%; max-width:520px; max-height:92vh; overflow-y:auto; box-shadow:0 8px 40px rgba(0,0,0,0.3);">
@@ -925,7 +968,10 @@
 <script>
 const STORES_BINS = JSON.parse('{{ stores_bins_json|escapejs }}');
 const ALL_MATERIALS = JSON.parse('{{ all_materials_json|escapejs }}');
+const WAREHOUSE_STOCK_SPLIT = JSON.parse('{{ warehouse_stock_split_json|escapejs }}');
+const WAREHOUSE_MATERIAL_TREND = JSON.parse('{{ warehouse_material_trend_json|escapejs }}');
 const WH_PK = parseInt(document.getElementById('wh-config').dataset.pk, 10);
+var _stockActionMode = 'in';
 
 // ── Material typeahead ──────────────────────────────────────────────────
 function filterMatList(q) {
@@ -986,6 +1032,31 @@ function closeAllocModal() {
 }
 document.getElementById('allocModal').addEventListener('click', function(e) {
     if (e.target === this) closeAllocModal();
+});
+
+function openStockActionModal(mode) {
+    _stockActionMode = mode;
+    document.getElementById('stockActionTitle').textContent = mode === 'out' ? 'Select Store For Stock Out' : 'Select Store For Stock In';
+    document.getElementById('stockActionStore').value = '';
+    document.getElementById('stockActionModal').style.display = 'flex';
+}
+
+function closeStockActionModal() {
+    document.getElementById('stockActionModal').style.display = 'none';
+}
+
+function goStockAction() {
+    var storeId = document.getElementById('stockActionStore').value;
+    if (!storeId) {
+        alert('Select store first.');
+        return;
+    }
+    var baseUrl = _stockActionMode === 'out' ? '{% url "goods_issue_create" %}' : '{% url "goods_received_create" %}';
+    window.location.href = baseUrl + '?store=' + encodeURIComponent(storeId);
+}
+
+document.getElementById('stockActionModal').addEventListener('click', function(e) {
+    if (e.target === this) closeStockActionModal();
 });
 
 function openMaterialAllocModal(materialId) {
@@ -1647,6 +1718,41 @@ function restoreActiveTab() {
 }
 
 restoreActiveTab();
+
+if (typeof Chart !== 'undefined') {
+    new Chart(document.getElementById('warehouseSplitChart'), {
+        type: 'doughnut',
+        data: {
+            labels: WAREHOUSE_STOCK_SPLIT.map(function(x){ return x.label; }),
+            datasets: [{
+                data: WAREHOUSE_STOCK_SPLIT.map(function(x){ return x.total; }),
+                backgroundColor: ['#177f63', '#b21f35']
+            }]
+        },
+        options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+    });
+
+    new Chart(document.getElementById('warehouseTrendChart'), {
+        type: 'bar',
+        data: {
+            labels: WAREHOUSE_MATERIAL_TREND.map(function(x){ return x.name; }),
+            datasets: [{
+                label: 'Outbound Qty',
+                data: WAREHOUSE_MATERIAL_TREND.map(function(x){ return x.total; }),
+                backgroundColor: '#2f6f8e',
+                borderRadius: 8
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { ticks: { color: '#355c7d' }, grid: { color: '#e8eff4' } },
+                y: { ticks: { color: '#355c7d' }, grid: { color: '#e8eff4' } }
+            }
+        }
+    });
+}
 
 function filterTable(tableId, query) {
     const q = query.toLowerCase();
