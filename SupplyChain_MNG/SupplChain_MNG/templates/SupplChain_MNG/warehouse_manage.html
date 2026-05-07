@@ -182,6 +182,24 @@
      TAB 1 — OVERVIEW
      ══════════════════════════════════ -->
 <div id="tab-overview" class="wh-tab-panel active">
+    <section class="panel panel-pad" style="margin-bottom: 12px; display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
+        <div style="font-size:0.86rem; color:var(--muted);">Analytics period</div>
+        <div style="display:flex; gap:6px; flex-wrap:wrap;">
+            <a class="btn {% if warehouse_selected_period == '7d' %}btn-primary{% else %}btn-neutral{% endif %} btn-sm" href="?period=7d">7D</a>
+            <a class="btn {% if warehouse_selected_period == '30d' %}btn-primary{% else %}btn-neutral{% endif %} btn-sm" href="?period=30d">30D</a>
+            <a class="btn {% if warehouse_selected_period == '90d' %}btn-primary{% else %}btn-neutral{% endif %} btn-sm" href="?period=90d">90D</a>
+            <a class="btn {% if warehouse_selected_period == '365d' %}btn-primary{% else %}btn-neutral{% endif %} btn-sm" href="?period=365d">1Y</a>
+        </div>
+    </section>
+
+    <section class="cards" style="margin-bottom: 12px;">
+        <article class="metric"><div class="label">Net Flow Qty</div><div class="value">{{ warehouse_net_flow_qty|floatformat:2 }}</div></article>
+        <article class="metric"><div class="label">Busiest Material</div><div class="value" style="font-size:1.02rem;">{{ warehouse_busiest_material }}</div></article>
+        <article class="metric"><div class="label">Moved Qty (Top Material)</div><div class="value">{{ warehouse_busiest_material_total|floatformat:2 }}</div></article>
+        <article class="metric"><div class="label">Busiest Day</div><div class="value" style="font-size:1.02rem;">{{ warehouse_busiest_day }}</div></article>
+        <article class="metric"><div class="label">Moved Qty (Busiest Day)</div><div class="value">{{ warehouse_busiest_day_total|floatformat:2 }}</div></article>
+    </section>
+
     <section class="split" style="margin-bottom: 12px;">
         <div class="panel panel-pad">
             <h3 style="margin-top: 0;">Stock In vs Stock Out</h3>
@@ -700,7 +718,7 @@
             <h3 style="margin: 0;">Recent Stock Movements</h3>
             <input type="search" id="movSearch" placeholder="Filter material, type, store…"
                 style="padding:6px 10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--text); font-size:0.88rem; width:220px;"
-                oninput="filterTable('movTable', this.value)">
+                oninput="setMovementSearch(this.value)">
         </div>
         <table id="movTable">
             <thead>
@@ -721,7 +739,7 @@
             </thead>
             <tbody>
                 {% for mov in recent_movements %}
-                <tr>
+                <tr data-mov-row="1" data-mov-direction="{{ mov.warehouse_direction|default:'' }}" data-mov-material="{{ mov.material.name|lower }}" data-mov-date="{{ mov.created_at|date:'Y-m-d' }}">
                     <td style="white-space:nowrap;">{{ mov.created_at|date:"d M Y H:i" }}</td>
                     <td>
                         {% if mov.movement_type == "RECEIPT" %}<span class="badge badge-ok">Receipt</span>
@@ -978,6 +996,7 @@ const WAREHOUSE_MOVEMENT_TIMELINE = JSON.parse('{{ warehouse_movement_timeline_j
 const WAREHOUSE_MATERIAL_FLOW = JSON.parse('{{ warehouse_material_flow_json|escapejs }}');
 const WH_PK = parseInt(document.getElementById('wh-config').dataset.pk, 10);
 var _stockActionMode = 'in';
+var _movementFilter = { query: '', direction: '', material: '', date: '' };
 
 // ── Material typeahead ──────────────────────────────────────────────────
 function filterMatList(q) {
@@ -1737,7 +1756,17 @@ if (typeof Chart !== 'undefined') {
                     backgroundColor: ['#177f63', '#b21f35']
                 }]
             },
-            options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+            options: {
+                responsive: true,
+                plugins: { legend: { position: 'bottom' } },
+                onClick: function(evt, elements) {
+                    if (!elements.length) return;
+                    var idx = elements[0].index;
+                    var label = (WAREHOUSE_STOCK_SPLIT[idx] && WAREHOUSE_STOCK_SPLIT[idx].label) || '';
+                    var direction = label.toLowerCase().indexOf('in') >= 0 ? 'inbound' : 'outbound';
+                    openMovementsFromChart({ direction: direction });
+                }
+            }
         });
     }
 
@@ -1783,6 +1812,14 @@ if (typeof Chart !== 'undefined') {
                 scales: {
                     x: { ticks: { color: '#355c7d' }, grid: { color: '#e8eff4' } },
                     y: { ticks: { color: '#355c7d' }, grid: { color: '#e8eff4' } }
+                },
+                onClick: function(evt, elements) {
+                    if (!elements.length) return;
+                    var point = elements[0];
+                    var dirByDataset = ['inbound', 'outbound', 'internal'];
+                    var direction = dirByDataset[point.datasetIndex] || '';
+                    var item = WAREHOUSE_MOVEMENT_TIMELINE[point.index] || {};
+                    openMovementsFromChart({ direction: direction, date: item.iso || '' });
                 }
             }
         });
@@ -1815,10 +1852,50 @@ if (typeof Chart !== 'undefined') {
                 scales: {
                     x: { ticks: { color: '#355c7d' }, grid: { color: '#e8eff4' } },
                     y: { ticks: { color: '#355c7d' }, grid: { color: '#e8eff4' } }
+                },
+                onClick: function(evt, elements) {
+                    if (!elements.length) return;
+                    var point = elements[0];
+                    var material = (WAREHOUSE_MATERIAL_FLOW[point.index] && WAREHOUSE_MATERIAL_FLOW[point.index].name) || '';
+                    var direction = point.datasetIndex === 0 ? 'inbound' : 'outbound';
+                    openMovementsFromChart({ material: material, direction: direction });
                 }
             }
         });
     }
+}
+
+function openMovementsFromChart(opts) {
+    opts = opts || {};
+    _movementFilter.direction = opts.direction || '';
+    _movementFilter.material = (opts.material || '').toLowerCase();
+    _movementFilter.date = opts.date || '';
+    _movementFilter.query = _movementFilter.material || '';
+
+    var movSearch = document.getElementById('movSearch');
+    if (movSearch) movSearch.value = opts.material || '';
+
+    var movBtn = document.querySelector('.wh-tab-btn[data-tab="movements"]');
+    if (movBtn) switchTab('movements', movBtn);
+    applyMovementFilters();
+    var movTable = document.getElementById('movTable');
+    if (movTable) movTable.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function setMovementSearch(query) {
+    _movementFilter.query = (query || '').toLowerCase();
+    applyMovementFilters();
+}
+
+function applyMovementFilters() {
+    var rows = document.querySelectorAll('#movTable tbody tr[data-mov-row="1"]');
+    rows.forEach(function(row) {
+        var textOk = !_movementFilter.query || row.textContent.toLowerCase().indexOf(_movementFilter.query) >= 0;
+        var dirOk = !_movementFilter.direction || row.dataset.movDirection === _movementFilter.direction;
+        var matOk = !_movementFilter.material || (row.dataset.movMaterial || '').indexOf(_movementFilter.material) >= 0;
+        var dateOk = !_movementFilter.date || row.dataset.movDate === _movementFilter.date;
+        row.style.display = (textOk && dirOk && matOk && dateOk) ? '' : 'none';
+    });
 }
 
 function filterTable(tableId, query) {

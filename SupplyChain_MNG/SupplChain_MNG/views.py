@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import datetime, time, timedelta
 import csv
 import json
 import importlib
@@ -1298,6 +1298,9 @@ def warehouse_manage_view(request, pk):
         balances_qs = balances_qs.filter(storage_bin__store_location_id__in=scoped_ids)
 
     wh_store_ids = list(stores_qs.values_list("id", flat=True))
+    selected_period = request.GET.get("period", "30d")
+    if selected_period not in ["7d", "30d", "90d", "365d"]:
+        selected_period = "30d"
 
     recent_movements = list(
         InventoryMovement.objects.select_related(
@@ -1309,6 +1312,8 @@ def warehouse_manage_view(request, pk):
     warehouse_movements_qs = InventoryMovement.objects.select_related(
         "material", "from_store", "to_store", "from_bin", "to_bin", "created_by"
     ).filter(Q(from_store_id__in=wh_store_ids) | Q(to_store_id__in=wh_store_ids))
+    period_start = _period_start(selected_period)
+    period_movements_qs = warehouse_movements_qs.filter(created_at__gte=period_start) if period_start else warehouse_movements_qs
     inbound_movement_count = 0
     outbound_movement_count = 0
     internal_movement_count = 0
@@ -1328,24 +1333,29 @@ def warehouse_manage_view(request, pk):
             mov.counterparty_label = mov.to_store.name if mov.to_store else "External destination"
             outbound_movement_count += 1
 
-    stock_in_total = warehouse_movements_qs.filter(to_store_id__in=wh_store_ids).aggregate(total=Sum("quantity"))["total"] or 0
-    stock_out_total = warehouse_movements_qs.filter(from_store_id__in=wh_store_ids).aggregate(total=Sum("quantity"))["total"] or 0
+    stock_in_total = period_movements_qs.filter(to_store_id__in=wh_store_ids).aggregate(total=Sum("quantity"))["total"] or 0
+    stock_out_total = period_movements_qs.filter(from_store_id__in=wh_store_ids).aggregate(total=Sum("quantity"))["total"] or 0
 
     today = timezone.localdate()
     trend_days = 14
     trend_dates = [today - timedelta(days=offset) for offset in range(trend_days - 1, -1, -1)]
     timeline_map = {
-        day.isoformat(): {"date": day.strftime("%d %b"), "inbound": 0.0, "outbound": 0.0, "internal": 0.0}
+        day.isoformat(): {
+            "date": day.strftime("%d %b"),
+            "iso": day.isoformat(),
+            "inbound": 0.0,
+            "outbound": 0.0,
+            "internal": 0.0,
+        }
         for day in trend_dates
     }
-    trend_start_dt = timezone.make_aware(
-        timezone.datetime.combine(trend_dates[0], timezone.datetime.min.time())
-    )
-    trend_rows = warehouse_movements_qs.filter(created_at__gte=trend_start_dt).values(
+    trend_start_dt = timezone.make_aware(datetime.combine(trend_dates[0], time.min))
+    trend_rows = period_movements_qs.filter(created_at__gte=trend_start_dt).values(
         "created_at", "from_store_id", "to_store_id", "quantity"
     )
     for row in trend_rows:
-        day_key = timezone.localtime(row["created_at"]).date().isoformat()
+        created_at = timezone.localtime(row["created_at"])
+        day_key = created_at.date().isoformat()
         if day_key not in timeline_map:
             continue
         from_here = row["from_store_id"] in wh_store_ids if row["from_store_id"] else False
@@ -1360,7 +1370,7 @@ def warehouse_manage_view(request, pk):
 
     movement_timeline = [timeline_map[day.isoformat()] for day in trend_dates]
     material_flow = list(
-        warehouse_movements_qs
+        period_movements_qs
         .values("material__name")
         .annotate(
             inbound=Sum(
@@ -1389,6 +1399,17 @@ def warehouse_manage_view(request, pk):
             ),
         )
         .order_by("-total_moved")[:8]
+    )
+    busiest_material = material_flow[0] if material_flow else None
+    busiest_day = max(
+        movement_timeline,
+        key=lambda row: (row["inbound"] + row["outbound"] + row["internal"]),
+        default=None,
+    )
+    busiest_day_total = (
+        (busiest_day["inbound"] + busiest_day["outbound"] + busiest_day["internal"])
+        if busiest_day
+        else 0
     )
 
     linked_projects = list(
@@ -1711,7 +1732,16 @@ def warehouse_manage_view(request, pk):
                 {"label": "Stock In", "total": float(stock_in_total)},
                 {"label": "Stock Out", "total": float(stock_out_total)},
             ]),
-            "warehouse_movement_timeline_json": json.dumps(movement_timeline),
+            "warehouse_movement_timeline_json": json.dumps([
+                {
+                    "date": row["date"],
+                    "iso": row["iso"],
+                    "inbound": row["inbound"],
+                    "outbound": row["outbound"],
+                    "internal": row["internal"],
+                }
+                for row in movement_timeline
+            ]),
             "warehouse_material_flow_json": json.dumps([
                 {
                     "name": row["material__name"] or "Unknown",
@@ -1721,6 +1751,12 @@ def warehouse_manage_view(request, pk):
                 }
                 for row in material_flow
             ]),
+            "warehouse_selected_period": selected_period,
+            "warehouse_net_flow_qty": float(stock_in_total or 0) - float(stock_out_total or 0),
+            "warehouse_busiest_material": (busiest_material["material__name"] if busiest_material else "—"),
+            "warehouse_busiest_material_total": float((busiest_material["total_moved"] if busiest_material else 0) or 0),
+            "warehouse_busiest_day": (busiest_day["date"] if busiest_day else "—"),
+            "warehouse_busiest_day_total": float(busiest_day_total or 0),
             "recent_movements": recent_movements,
             "all_materials_json": json.dumps(all_materials),
             "alloc_store_rows": alloc_store_rows,
