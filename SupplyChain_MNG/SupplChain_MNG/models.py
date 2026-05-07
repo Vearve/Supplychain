@@ -677,13 +677,41 @@ class DeliveryNote(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
-    driver = models.CharField(max_length=120, blank=True, help_text="Name of the driver transporting goods")
-    mobile_equipment = models.CharField(max_length=120, blank=True, help_text="Vehicle registration, asset tag, or equipment ID")
+    driver = models.ForeignKey(
+        "Driver",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="delivery_notes",
+        help_text="Select a driver from fleet management",
+    )
+    mobile_equipment = models.ForeignKey(
+        "MobileEquipment",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="delivery_notes",
+        help_text="Select vehicle/equipment from fleet management",
+    )
     reference_type = models.CharField(max_length=50, blank=True, help_text="Type of reference (e.g., PO, Invoice, Work Order)")
     reference_number = models.CharField(max_length=50, blank=True, help_text="Reference document number")
     transfer_type = models.CharField(max_length=30, choices=TRANSFER_TYPE_CHOICES, blank=True, help_text="Type of transfer being performed")
-    source_warehouse_or_site = models.CharField(max_length=150, blank=True, help_text="Name of source warehouse or project/site")
-    destination_warehouse_or_site = models.CharField(max_length=150, blank=True, help_text="Name of destination warehouse or project/site")
+    source_warehouse_or_site = models.ForeignKey(
+        "StoreLocation",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="delivery_notes_as_source",
+        help_text="Select source warehouse or project/site store",
+    )
+    destination_warehouse_or_site = models.ForeignKey(
+        "StoreLocation",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="delivery_notes_as_destination",
+        help_text="Select destination warehouse or project/site store",
+    )
     notes = models.TextField(blank=True)
 
     class Meta:

@@ -475,6 +475,18 @@ RequisitionItemFormSet = inlineformset_factory(
 
 
 class DeliveryNoteForm(forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        store_qs = StoreLocation.objects.select_related("warehouse", "project").filter(is_active=True).order_by("name")
+        self.fields["source_warehouse_or_site"].queryset = store_qs
+        self.fields["destination_warehouse_or_site"].queryset = store_qs
+        self.fields["source_warehouse_or_site"].empty_label = "Select source warehouse/site"
+        self.fields["destination_warehouse_or_site"].empty_label = "Select destination warehouse/site"
+        self.fields["driver"].queryset = Driver.objects.filter(is_active=True).order_by("full_name")
+        self.fields["driver"].empty_label = "Select driver"
+        self.fields["mobile_equipment"].queryset = MobileEquipment.objects.filter(is_active=True).order_by("name")
+        self.fields["mobile_equipment"].empty_label = "Select vehicle/equipment"
+
     class Meta:
         model = DeliveryNote
         fields = [

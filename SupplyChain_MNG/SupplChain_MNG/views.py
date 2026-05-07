@@ -3087,6 +3087,10 @@ def delivery_notes_view(request):
         if not items:
             raise ValidationError("Delivery note has no items to dispatch.")
 
+        source_store = note.source_warehouse_or_site
+        if source_store is None:
+            raise ValidationError("Select a source warehouse/site before dispatching this delivery note.")
+
         for item in items:
             remaining = Decimal(str(item.quantity))
             if remaining <= 0:
@@ -3098,7 +3102,9 @@ def delivery_notes_view(request):
                         "inventory_balance",
                         "inventory_balance__storage_bin",
                         "inventory_balance__storage_bin__store_location",
-                    ).order_by("created_at")
+                    )
+                    .filter(inventory_balance__storage_bin__store_location=source_store)
+                    .order_by("created_at")
                 )
                 for line in reservation_lines:
                     if remaining <= 0:
@@ -3113,6 +3119,8 @@ def delivery_notes_view(request):
                         from_store=bal.storage_bin.store_location,
                         from_bin=bal.storage_bin,
                         delivery_note=note,
+                        driver=note.driver,
+                        mobile_equipment=note.mobile_equipment,
                         reference_type="DELIVERY_NOTE",
                         reference_number=note.note_number,
                         notes=f"Dispatch against requisition {note.source_requisition_id}",
@@ -3132,8 +3140,8 @@ def delivery_notes_view(request):
             if remaining > 0:
                 balances = list(
                     InventoryBalance.objects.select_related("storage_bin", "storage_bin__store_location")
-                    .filter(material=item.material, storage_bin__store_location__location_type="HQ")
-                    .order_by("storage_bin__store_location__name", "storage_bin__bin_code")
+                    .filter(material=item.material, storage_bin__store_location=source_store)
+                    .order_by("storage_bin__bin_code")
                 )
                 for bal in balances:
                     if remaining <= 0:
@@ -3149,16 +3157,18 @@ def delivery_notes_view(request):
                         from_store=bal.storage_bin.store_location,
                         from_bin=bal.storage_bin,
                         delivery_note=note,
+                        driver=note.driver,
+                        mobile_equipment=note.mobile_equipment,
                         reference_type="DELIVERY_NOTE",
                         reference_number=note.note_number,
-                        notes="Dispatch deduction from HQ stock",
+                        notes=f"Dispatch deduction from {source_store.name}",
                         created_by=actor,
                     )
                     remaining -= take
 
             if remaining > 0:
                 raise ValidationError(
-                    f"Insufficient available HQ stock for {item.material.name}. Short by {remaining}."
+                    f"Insufficient available stock in {source_store.name} for {item.material.name}. Short by {remaining}."
                 )
 
         if note.source_requisition_id:
@@ -3172,8 +3182,9 @@ def delivery_notes_view(request):
         if note.status != "DISPATCHED":
             raise ValidationError("Only dispatched delivery notes can be received.")
 
-        destination_store = None
-        if note.source_requisition_id and note.source_requisition.project_id:
+        destination_store = note.destination_warehouse_or_site
+
+        if destination_store is None and note.source_requisition_id and note.source_requisition.project_id:
             destination_store = (
                 StoreLocation.objects.filter(
                     project=note.source_requisition.project,
@@ -3197,7 +3208,7 @@ def delivery_notes_view(request):
 
         if destination_store is None:
             raise ValidationError(
-                "No active site store found for this delivery note. Configure a SITE store for the project or matching destination name first."
+                "Select a destination warehouse/site before receiving this delivery note."
             )
 
         destination_bin = (
@@ -3218,9 +3229,11 @@ def delivery_notes_view(request):
                 to_store=destination_store,
                 to_bin=destination_bin,
                 delivery_note=note,
+                driver=note.driver,
+                mobile_equipment=note.mobile_equipment,
                 reference_type="DELIVERY_NOTE",
                 reference_number=note.note_number,
-                notes=f"Site receipt for delivery note {note.note_number}",
+                notes=f"Stock receipt into {destination_store.name} for delivery note {note.note_number}",
                 created_by=actor,
             )
 
