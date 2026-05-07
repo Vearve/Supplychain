@@ -1304,19 +1304,28 @@ def warehouse_manage_view(request, pk):
 
     recent_movements = list(
         InventoryMovement.objects.select_related(
-            "material", "from_store", "to_store", "from_bin", "to_bin", "created_by"
+            "material", "from_store", "to_store", "from_bin", "to_bin", "created_by", "delivery_note"
         )
         .filter(Q(from_store_id__in=wh_store_ids) | Q(to_store_id__in=wh_store_ids))
         .order_by("-created_at")[:50]
     )
     warehouse_movements_qs = InventoryMovement.objects.select_related(
-        "material", "from_store", "to_store", "from_bin", "to_bin", "created_by"
+        "material", "from_store", "to_store", "from_bin", "to_bin", "created_by", "delivery_note"
     ).filter(Q(from_store_id__in=wh_store_ids) | Q(to_store_id__in=wh_store_ids))
     period_start = _period_start(selected_period)
     period_movements_qs = warehouse_movements_qs.filter(created_at__gte=period_start) if period_start else warehouse_movements_qs
     inbound_movement_count = 0
     outbound_movement_count = 0
     internal_movement_count = 0
+    fallback_delivery_numbers = {
+        mov.reference_number
+        for mov in recent_movements
+        if (not mov.delivery_note_id) and mov.reference_type == "DELIVERY_NOTE" and mov.reference_number
+    }
+    fallback_delivery_map = {
+        row.note_number: row.id
+        for row in DeliveryNote.objects.filter(note_number__in=fallback_delivery_numbers).only("id", "note_number")
+    }
     for mov in recent_movements:
         from_here = mov.from_store_id in wh_store_ids if mov.from_store_id else False
         to_here = mov.to_store_id in wh_store_ids if mov.to_store_id else False
@@ -1332,6 +1341,12 @@ def warehouse_manage_view(request, pk):
             mov.warehouse_direction = "outbound"
             mov.counterparty_label = mov.to_store.name if mov.to_store else "External destination"
             outbound_movement_count += 1
+        mov.delivery_note_pk = mov.delivery_note_id or fallback_delivery_map.get(mov.reference_number)
+        mov.delivery_note_number = (
+            mov.delivery_note.note_number
+            if mov.delivery_note_id and mov.delivery_note
+            else (mov.reference_number if mov.reference_type == "DELIVERY_NOTE" else "")
+        )
 
     stock_in_total = period_movements_qs.filter(to_store_id__in=wh_store_ids).aggregate(total=Sum("quantity"))["total"] or 0
     stock_out_total = period_movements_qs.filter(from_store_id__in=wh_store_ids).aggregate(total=Sum("quantity"))["total"] or 0
@@ -3044,6 +3059,7 @@ def delivery_notes_view(request):
                         quantity=take,
                         from_store=bal.storage_bin.store_location,
                         from_bin=bal.storage_bin,
+                        delivery_note=note,
                         reference_type="DELIVERY_NOTE",
                         reference_number=note.note_number,
                         notes=f"Dispatch against requisition {note.source_requisition_id}",
@@ -3079,6 +3095,7 @@ def delivery_notes_view(request):
                         quantity=take,
                         from_store=bal.storage_bin.store_location,
                         from_bin=bal.storage_bin,
+                        delivery_note=note,
                         reference_type="DELIVERY_NOTE",
                         reference_number=note.note_number,
                         notes="Dispatch deduction from HQ stock",
@@ -3147,6 +3164,7 @@ def delivery_notes_view(request):
                 quantity=item.quantity,
                 to_store=destination_store,
                 to_bin=destination_bin,
+                delivery_note=note,
                 reference_type="DELIVERY_NOTE",
                 reference_number=note.note_number,
                 notes=f"Site receipt for delivery note {note.note_number}",

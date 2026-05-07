@@ -738,6 +738,7 @@
                     <th>To Store</th>
                     <th>To Bin</th>
                     <th>Ref</th>
+                    <th>Delivery Note</th>
                     <th>By</th>
                 </tr>
             </thead>
@@ -770,10 +771,17 @@
                     <td>{{ mov.to_store.name|default:"—" }}</td>
                     <td>{{ mov.to_bin.bin_code|default:"—" }}</td>
                     <td style="font-size:0.82rem;color:var(--muted);">{{ mov.reference_number|default:"" }}</td>
+                    <td style="font-size:0.82rem;">
+                        {% if mov.delivery_note_pk %}
+                        <a href="{% url 'delivery_note_pdf' mov.delivery_note_pk %}" target="_blank" style="color:var(--brand); text-decoration:none;">{{ mov.delivery_note_number|default:"Open" }}</a>
+                        {% else %}
+                        <span style="color:var(--muted);">—</span>
+                        {% endif %}
+                    </td>
                     <td style="font-size:0.82rem;">{{ mov.created_by.get_full_name|default:mov.created_by.username|default:"—" }}</td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="12" style="color:var(--muted);">No stock movements recorded for this warehouse yet.</td></tr>
+                <tr><td colspan="13" style="color:var(--muted);">No stock movements recorded for this warehouse yet.</td></tr>
                 {% endfor %}
             </tbody>
         </table>
