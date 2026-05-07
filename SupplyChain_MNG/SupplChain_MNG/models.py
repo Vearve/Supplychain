@@ -114,6 +114,43 @@ class StockTransaction(models.Model):
     @property
     def code_number_display(self):
         return self.material.code_number if self.material else self.code_number
+    @property
+    def total_qty_requested(self):
+        """Calculate total requested quantity including line items."""
+        line_qty = sum([Decimal(str(item.quantity_requested or 0)) for item in self.items.all()], Decimal("0.00"))
+        if line_qty > 0:
+            return line_qty
+        return Decimal(str(self.quantity_requested or 0))
+    
+    @property
+    def fulfillment_percentage(self):
+        """Calculate fulfillment percentage (0-100)."""
+        total = self.total_qty_requested
+        if total <= 0:
+            return 0
+        pct = (self.quantity_fulfilled / total) * 100
+        return min(float(pct), 100.0)
+    
+    @property
+    def days_pending(self):
+        """Days since requisition was requested."""
+        return (timezone.now() - self.date_requested).days
+    
+    @property
+    def sla_status(self):
+        """SLA status: 'on-time', 'overdue', or 'no-deadline'."""
+        if not self.sla_deadline:
+            return "no-deadline"
+        if self.fulfilled:
+            return "on-time"
+        if timezone.now() > self.sla_deadline:
+            return "overdue"
+        return "on-time"
+    
+    def get_linked_delivery_notes(self):
+        """Get all delivery notes that fulfill this requisition."""
+        from . import DeliveryNote
+        return DeliveryNote.objects.filter(source_requisition=self).order_by("-date_issued")
 
 
 class Project(models.Model):
@@ -380,6 +417,8 @@ class Requisition(models.Model):
     rejection_reason = models.TextField(blank=True)
     reserved_quantity = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
     fulfilled = models.BooleanField(default=False)
+    sla_deadline = models.DateTimeField(null=True, blank=True, help_text="Target fulfillment deadline for accountability tracking")
+    quantity_fulfilled = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"), help_text="Actual quantity delivered to destination")
     notes = models.TextField(blank=True)
 
     def _generate_req_number(self):

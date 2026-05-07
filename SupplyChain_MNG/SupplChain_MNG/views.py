@@ -1160,6 +1160,10 @@ def requisitions_view(request):
         else:
             req.line_count = 1 if req.material else 0
             req.total_qty = Decimal(str(req.quantity_requested or 0))
+    req.fulfillment_pct = req.fulfillment_percentage
+    req.sla_status = req.sla_status
+    req.days_pending = req.days_pending
+    req.linked_dn_count = req.get_linked_delivery_notes().count()
 
     unread_ids = list(
         Requisition.objects.exclude(requested_by=request.user)
@@ -1201,6 +1205,13 @@ def requisition_detail_view(request, pk):
             "project_context": _project_context_for_list(request),
         }
     )
+    linked_dn = list(req.get_linked_delivery_notes().select_related("created_by"))
+    context.update({
+        "linked_delivery_notes": linked_dn,
+        "fulfillment_pct": req.fulfillment_percentage,
+        "sla_status": req.sla_status,
+        "days_pending": req.days_pending,
+    })
     return render(request, "SupplChain_MNG/requisition_detail.html", context)
 
 

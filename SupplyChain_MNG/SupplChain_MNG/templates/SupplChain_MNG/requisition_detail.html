@@ -10,6 +10,57 @@
     {% endif %}
     <a class="btn btn-neutral" href="{% url 'requisitions' %}{% if project_context %}?project={{ project_context.id }}{% endif %}">← Back to Requisitions</a>
 </div>
+<div class="panel panel-pad" style="margin-bottom: 12px;">
+    <h3 style="margin-top:0;">Accountability & Fulfillment</h3>
+    <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:10px;">
+        <div><strong>Fulfillment %</strong><div>{{ fulfillment_pct|floatformat:1 }}%</div></div>
+        <div><strong>Quantity Fulfilled</strong><div>{{ req.quantity_fulfilled|floatformat:2 }}</div></div>
+        <div><strong>Total Requested</strong><div>{{ req.total_qty_requested }}</div></div>
+        <div><strong>Days Pending</strong><div>{{ days_pending }}</div></div>
+        <div><strong>SLA Deadline</strong><div>{{ req.sla_deadline|date:'Y-m-d'|default:'—' }}</div></div>
+        <div><strong>SLA Status</strong><div>
+            {% if sla_status == 'on-time' %}<span class="badge badge-ok">On-Time</span>
+            {% elif sla_status == 'overdue' %}<span class="badge badge-danger">Overdue</span>
+            {% else %}<span class="badge badge-neutral">No Deadline</span>{% endif %}
+        </div></div>
+    </div>
+</div>
+
+{% if linked_delivery_notes %}
+<div class="panel panel-pad table-wrap" style="margin-bottom: 12px;">
+    <h3 style="margin-top:0;">Fulfilling Delivery Notes</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Delivery Note</th>
+                <th>Status</th>
+                <th>Date Issued</th>
+                <th>From Location</th>
+                <th>To Location</th>
+                <th>Created By</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for dn in linked_delivery_notes %}
+            <tr>
+                <td><a href="{% url 'delivery_note_pdf' dn.id %}">{{ dn.note_number }}</a></td>
+                <td>
+                    {% if dn.status == 'APPROVED' %}<span class="badge badge-ok">{{ dn.get_status_display }}</span>
+                    {% elif dn.status == 'DISPATCHED' %}<span class="badge badge-warn">{{ dn.get_status_display }}</span>
+                    {% elif dn.status == 'RECEIVED' %}<span class="badge badge-ok">{{ dn.get_status_display }}</span>
+                    {% else %}<span class="badge badge-neutral">{{ dn.get_status_display }}</span>{% endif %}
+                </td>
+                <td>{{ dn.date_issued|date:'Y-m-d' }}</td>
+                <td>{{ dn.from_location|default:'-' }}</td>
+                <td>{{ dn.to_location|default:'-' }}</td>
+                <td>{{ dn.created_by.username|default:'-' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
 
 <div class="panel panel-pad" style="margin-bottom: 12px;">
     <h3 style="margin-top:0;">Request Header</h3>

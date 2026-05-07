@@ -24,6 +24,10 @@
                 <th>Project/Site</th>
                 <th>Requested By</th>
                 <th>Status</th>
+                                <th>Fulfillment</th>
+                                <th>SLA Status</th>
+                                <th>Days Pending</th>
+                                <th>Linked DNs</th>
                 <th>Actions</th>
             </tr>
         </thead>
@@ -39,6 +43,14 @@
                     {% elif item.status == 'VALIDATED' %}<span class="badge badge-warn">{{ item.get_status_display }}</span>
                     {% else %}<span class="badge badge-neutral">{{ item.get_status_display }}</span>{% endif %}
                 </td>
+                                <td>{{ item.fulfillment_pct|floatformat:0 }}%</td>
+                                <td>
+                                    {% if item.sla_status == 'on-time' %}<span class="badge badge-ok">On-Time</span>
+                                    {% elif item.sla_status == 'overdue' %}<span class="badge badge-danger">Overdue</span>
+                                    {% else %}<span class="badge badge-neutral">No Deadline</span>{% endif %}
+                                </td>
+                                <td>{{ item.days_pending }} days</td>
+                                <td>{{ item.linked_dn_count }}</td>
                 <td>
                     <a class="btn btn-neutral btn-sm" href="{% url 'requisition_detail' item.id %}{% if project_context %}?project={{ project_context.id }}{% endif %}">View</a>
                     {% if can_manage_current %}
@@ -83,7 +95,7 @@
                 </td>
             </tr>
             {% empty %}
-            <tr><td colspan="5">No requisitions found for selected filters.</td></tr>
+            <tr><td colspan="9">No requisitions found for selected filters.</td></tr>
             {% endfor %}
         </tbody>
     </table>
