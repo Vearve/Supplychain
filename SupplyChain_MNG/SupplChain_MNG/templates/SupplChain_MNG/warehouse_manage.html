@@ -716,9 +716,13 @@
     <section class="panel panel-pad table-wrap" style="margin-bottom: 12px;">
         <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:10px;">
             <h3 style="margin: 0;">Recent Stock Movements</h3>
-            <input type="search" id="movSearch" placeholder="Filter material, type, store…"
-                style="padding:6px 10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--text); font-size:0.88rem; width:220px;"
-                oninput="setMovementSearch(this.value)">
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                <span id="movFilterTag" style="display:none; font-size:0.78rem; color:var(--muted); border:1px solid var(--line); border-radius:999px; padding:3px 8px;">Chart filter active</span>
+                <input type="search" id="movSearch" placeholder="Filter material, type, store…"
+                    style="padding:6px 10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--text); font-size:0.88rem; width:220px;"
+                    oninput="setMovementSearch(this.value)">
+                <button type="button" class="btn btn-neutral btn-sm" onclick="clearMovementFilters()">Clear Filters</button>
+            </div>
         </div>
         <table id="movTable">
             <thead>
@@ -1887,6 +1891,13 @@ function setMovementSearch(query) {
     applyMovementFilters();
 }
 
+function clearMovementFilters() {
+    _movementFilter = { query: '', direction: '', material: '', date: '' };
+    var movSearch = document.getElementById('movSearch');
+    if (movSearch) movSearch.value = '';
+    applyMovementFilters();
+}
+
 function applyMovementFilters() {
     var rows = document.querySelectorAll('#movTable tbody tr[data-mov-row="1"]');
     rows.forEach(function(row) {
@@ -1896,6 +1907,12 @@ function applyMovementFilters() {
         var dateOk = !_movementFilter.date || row.dataset.movDate === _movementFilter.date;
         row.style.display = (textOk && dirOk && matOk && dateOk) ? '' : 'none';
     });
+
+    var isChartScoped = !!(_movementFilter.direction || _movementFilter.material || _movementFilter.date);
+    var tag = document.getElementById('movFilterTag');
+    if (tag) {
+        tag.style.display = isChartScoped ? 'inline-flex' : 'none';
+    }
 }
 
 function filterTable(tableId, query) {
