@@ -11,7 +11,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth.models import Group, User
-from django.db.models import Count, F, Max, Q, Sum
+from django.db.models import Case, Count, DecimalField, F, Max, Q, Sum, Value, When
 from django.db import IntegrityError, transaction
 from django.db.models.functions import TruncMonth
 from django.http import Http404, HttpResponse, JsonResponse
@@ -1330,12 +1330,65 @@ def warehouse_manage_view(request, pk):
 
     stock_in_total = warehouse_movements_qs.filter(to_store_id__in=wh_store_ids).aggregate(total=Sum("quantity"))["total"] or 0
     stock_out_total = warehouse_movements_qs.filter(from_store_id__in=wh_store_ids).aggregate(total=Sum("quantity"))["total"] or 0
-    movement_material_trend = list(
+
+    today = timezone.localdate()
+    trend_days = 14
+    trend_dates = [today - timedelta(days=offset) for offset in range(trend_days - 1, -1, -1)]
+    timeline_map = {
+        day.isoformat(): {"date": day.strftime("%d %b"), "inbound": 0.0, "outbound": 0.0, "internal": 0.0}
+        for day in trend_dates
+    }
+    trend_start_dt = timezone.make_aware(
+        timezone.datetime.combine(trend_dates[0], timezone.datetime.min.time())
+    )
+    trend_rows = warehouse_movements_qs.filter(created_at__gte=trend_start_dt).values(
+        "created_at", "from_store_id", "to_store_id", "quantity"
+    )
+    for row in trend_rows:
+        day_key = timezone.localtime(row["created_at"]).date().isoformat()
+        if day_key not in timeline_map:
+            continue
+        from_here = row["from_store_id"] in wh_store_ids if row["from_store_id"] else False
+        to_here = row["to_store_id"] in wh_store_ids if row["to_store_id"] else False
+        qty = float(row["quantity"] or 0)
+        if from_here and to_here:
+            timeline_map[day_key]["internal"] += qty
+        elif to_here:
+            timeline_map[day_key]["inbound"] += qty
+        else:
+            timeline_map[day_key]["outbound"] += qty
+
+    movement_timeline = [timeline_map[day.isoformat()] for day in trend_dates]
+    material_flow = list(
         warehouse_movements_qs
-        .filter(from_store_id__in=wh_store_ids)
         .values("material__name")
-        .annotate(total=Sum("quantity"))
-        .order_by("-total")[:8]
+        .annotate(
+            inbound=Sum(
+                Case(
+                    When(Q(to_store_id__in=wh_store_ids) & ~Q(from_store_id__in=wh_store_ids), then=F("quantity")),
+                    default=Value(0),
+                    output_field=DecimalField(max_digits=14, decimal_places=2),
+                )
+            ),
+            outbound=Sum(
+                Case(
+                    When(Q(from_store_id__in=wh_store_ids) & ~Q(to_store_id__in=wh_store_ids), then=F("quantity")),
+                    default=Value(0),
+                    output_field=DecimalField(max_digits=14, decimal_places=2),
+                )
+            ),
+            total_moved=Sum(
+                Case(
+                    When(
+                        Q(to_store_id__in=wh_store_ids) | Q(from_store_id__in=wh_store_ids),
+                        then=F("quantity"),
+                    ),
+                    default=Value(0),
+                    output_field=DecimalField(max_digits=14, decimal_places=2),
+                )
+            ),
+        )
+        .order_by("-total_moved")[:8]
     )
 
     linked_projects = list(
@@ -1658,9 +1711,15 @@ def warehouse_manage_view(request, pk):
                 {"label": "Stock In", "total": float(stock_in_total)},
                 {"label": "Stock Out", "total": float(stock_out_total)},
             ]),
-            "warehouse_material_trend_json": json.dumps([
-                {"name": row["material__name"] or "Unknown", "total": float(row["total"] or 0)}
-                for row in movement_material_trend
+            "warehouse_movement_timeline_json": json.dumps(movement_timeline),
+            "warehouse_material_flow_json": json.dumps([
+                {
+                    "name": row["material__name"] or "Unknown",
+                    "inbound": float(row["inbound"] or 0),
+                    "outbound": float(row["outbound"] or 0),
+                    "total": float(row["total_moved"] or 0),
+                }
+                for row in material_flow
             ]),
             "recent_movements": recent_movements,
             "all_materials_json": json.dumps(all_materials),

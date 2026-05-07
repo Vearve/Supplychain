@@ -188,9 +188,14 @@
             <canvas id="warehouseSplitChart" height="150"></canvas>
         </div>
         <div class="panel panel-pad">
-            <h3 style="margin-top: 0;">Most Moved Materials</h3>
-            <canvas id="warehouseTrendChart" height="150"></canvas>
+            <h3 style="margin-top: 0;">Movement Trend (Last 14 Days)</h3>
+            <canvas id="warehouseTimelineChart" height="150"></canvas>
         </div>
+    </section>
+
+    <section class="panel panel-pad" style="margin-bottom: 12px;">
+        <h3 style="margin-top: 0;">Most Moved Materials (Inbound vs Outbound)</h3>
+        <canvas id="warehouseMaterialFlowChart" height="130"></canvas>
     </section>
 
     <section class="panel panel-pad table-wrap" style="margin-bottom: 12px;">
@@ -969,7 +974,8 @@
 const STORES_BINS = JSON.parse('{{ stores_bins_json|escapejs }}');
 const ALL_MATERIALS = JSON.parse('{{ all_materials_json|escapejs }}');
 const WAREHOUSE_STOCK_SPLIT = JSON.parse('{{ warehouse_stock_split_json|escapejs }}');
-const WAREHOUSE_MATERIAL_TREND = JSON.parse('{{ warehouse_material_trend_json|escapejs }}');
+const WAREHOUSE_MOVEMENT_TIMELINE = JSON.parse('{{ warehouse_movement_timeline_json|escapejs }}');
+const WAREHOUSE_MATERIAL_FLOW = JSON.parse('{{ warehouse_material_flow_json|escapejs }}');
 const WH_PK = parseInt(document.getElementById('wh-config').dataset.pk, 10);
 var _stockActionMode = 'in';
 
@@ -1720,38 +1726,99 @@ function restoreActiveTab() {
 restoreActiveTab();
 
 if (typeof Chart !== 'undefined') {
-    new Chart(document.getElementById('warehouseSplitChart'), {
-        type: 'doughnut',
-        data: {
-            labels: WAREHOUSE_STOCK_SPLIT.map(function(x){ return x.label; }),
-            datasets: [{
-                data: WAREHOUSE_STOCK_SPLIT.map(function(x){ return x.total; }),
-                backgroundColor: ['#177f63', '#b21f35']
-            }]
-        },
-        options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
-    });
+    var splitCanvas = document.getElementById('warehouseSplitChart');
+    if (splitCanvas) {
+        new Chart(splitCanvas, {
+            type: 'doughnut',
+            data: {
+                labels: WAREHOUSE_STOCK_SPLIT.map(function(x){ return x.label; }),
+                datasets: [{
+                    data: WAREHOUSE_STOCK_SPLIT.map(function(x){ return x.total; }),
+                    backgroundColor: ['#177f63', '#b21f35']
+                }]
+            },
+            options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+        });
+    }
 
-    new Chart(document.getElementById('warehouseTrendChart'), {
-        type: 'bar',
-        data: {
-            labels: WAREHOUSE_MATERIAL_TREND.map(function(x){ return x.name; }),
-            datasets: [{
-                label: 'Outbound Qty',
-                data: WAREHOUSE_MATERIAL_TREND.map(function(x){ return x.total; }),
-                backgroundColor: '#2f6f8e',
-                borderRadius: 8
-            }]
-        },
-        options: {
-            responsive: true,
-            plugins: { legend: { display: false } },
-            scales: {
-                x: { ticks: { color: '#355c7d' }, grid: { color: '#e8eff4' } },
-                y: { ticks: { color: '#355c7d' }, grid: { color: '#e8eff4' } }
+    var timelineCanvas = document.getElementById('warehouseTimelineChart');
+    if (timelineCanvas) {
+        new Chart(timelineCanvas, {
+            type: 'line',
+            data: {
+                labels: WAREHOUSE_MOVEMENT_TIMELINE.map(function(x){ return x.date; }),
+                datasets: [
+                    {
+                        label: 'Inbound',
+                        data: WAREHOUSE_MOVEMENT_TIMELINE.map(function(x){ return x.inbound; }),
+                        borderColor: '#177f63',
+                        backgroundColor: 'rgba(23,127,99,0.15)',
+                        tension: 0.3,
+                        fill: true,
+                        pointRadius: 2
+                    },
+                    {
+                        label: 'Outbound',
+                        data: WAREHOUSE_MOVEMENT_TIMELINE.map(function(x){ return x.outbound; }),
+                        borderColor: '#b21f35',
+                        backgroundColor: 'rgba(178,31,53,0.15)',
+                        tension: 0.3,
+                        fill: true,
+                        pointRadius: 2
+                    },
+                    {
+                        label: 'Internal',
+                        data: WAREHOUSE_MOVEMENT_TIMELINE.map(function(x){ return x.internal; }),
+                        borderColor: '#2f6f8e',
+                        backgroundColor: 'rgba(47,111,142,0.12)',
+                        tension: 0.3,
+                        fill: false,
+                        pointRadius: 2
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { position: 'bottom' } },
+                scales: {
+                    x: { ticks: { color: '#355c7d' }, grid: { color: '#e8eff4' } },
+                    y: { ticks: { color: '#355c7d' }, grid: { color: '#e8eff4' } }
+                }
             }
-        }
-    });
+        });
+    }
+
+    var materialFlowCanvas = document.getElementById('warehouseMaterialFlowChart');
+    if (materialFlowCanvas) {
+        new Chart(materialFlowCanvas, {
+            type: 'bar',
+            data: {
+                labels: WAREHOUSE_MATERIAL_FLOW.map(function(x){ return x.name; }),
+                datasets: [
+                    {
+                        label: 'Inbound Qty',
+                        data: WAREHOUSE_MATERIAL_FLOW.map(function(x){ return x.inbound; }),
+                        backgroundColor: '#177f63',
+                        borderRadius: 8
+                    },
+                    {
+                        label: 'Outbound Qty',
+                        data: WAREHOUSE_MATERIAL_FLOW.map(function(x){ return x.outbound; }),
+                        backgroundColor: '#b21f35',
+                        borderRadius: 8
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { position: 'bottom' } },
+                scales: {
+                    x: { ticks: { color: '#355c7d' }, grid: { color: '#e8eff4' } },
+                    y: { ticks: { color: '#355c7d' }, grid: { color: '#e8eff4' } }
+                }
+            }
+        });
+    }
 }
 
 function filterTable(tableId, query) {
