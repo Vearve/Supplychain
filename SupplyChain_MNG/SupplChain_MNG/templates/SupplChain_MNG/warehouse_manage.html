@@ -153,6 +153,7 @@
 <div class="panel panel-pad" style="margin-bottom: 12px; display: flex; gap: 8px; flex-wrap: wrap;">
     <a class="btn btn-neutral" href="{% url 'warehouse_management' %}">← Back to Warehouses</a>
     <a class="btn btn-primary" href="{% url 'goods_received_create' %}">Stock In</a>
+    <a class="btn btn-primary" href="{% url 'goods_issue_create' %}">Stock Out</a>
     <a class="btn btn-primary" href="{% url 'warehouse_transfer_preset' %}">Warehouse → Site Transfer</a>
     <a class="btn btn-neutral" href="{% url 'inventory_management' %}">Inventory Setup</a>
 </div>
@@ -163,63 +164,13 @@
     <button type="button" class="wh-tab-btn" data-tab="materials" onclick="switchTab('materials', this)">Materials</button>
     <button type="button" class="wh-tab-btn" data-tab="layout" onclick="switchTab('layout', this)">Layout</button>
     <button type="button" class="wh-tab-btn" data-tab="movements" onclick="switchTab('movements', this)">Movements</button>
+    <button type="button" class="wh-tab-btn" data-tab="presets" onclick="switchTab('presets', this)">Presets</button>
 </div>
 
 <!-- ══════════════════════════════════
      TAB 1 — OVERVIEW
      ══════════════════════════════════ -->
 <div id="tab-overview" class="wh-tab-panel active">
-
-    <section class="panel panel-pad" style="margin-bottom: 12px;">
-        <h3 style="margin-top: 0;">Manage Warehouse Setup In One Place</h3>
-        <div class="form-grid">
-            <form class="form-block" method="post">
-                {% csrf_token %}
-                <input type="hidden" name="action" value="create_store">
-                <h4>Create Store In This Warehouse</h4>
-                <p>Create HQ/Site store directly here and attach it to {{ warehouse.name }}.</p>
-                {% for field in store_form %}
-                <div class="field">
-                    <label>{{ field.label }}</label>
-                    {{ field }}
-                    {% for err in field.errors %}<div style="color:var(--bad); font-size:0.82rem;">{{ err }}</div>{% endfor %}
-                </div>
-                {% endfor %}
-                <button type="submit" class="btn btn-primary">Save Store</button>
-            </form>
-
-            <form class="form-block" method="post">
-                {% csrf_token %}
-                <input type="hidden" name="action" value="create_bin">
-                <h4>Create Bin Hierarchy</h4>
-                <p>Define all 5 levels: Zone, Aisle, Rack, Shelf, and Bin.</p>
-                {% for field in bin_form %}
-                <div class="field">
-                    <label>{{ field.label }}</label>
-                    {{ field }}
-                    {% for err in field.errors %}<div style="color:var(--bad); font-size:0.82rem;">{{ err }}</div>{% endfor %}
-                </div>
-                {% endfor %}
-                <button type="submit" class="btn btn-primary">Save Bin</button>
-            </form>
-
-            <form class="form-block" method="post">
-                {% csrf_token %}
-                <input type="hidden" name="action" value="link_project">
-                <h4>Link Project / Site</h4>
-                <p>Select from existing projects and map a site store to this warehouse.</p>
-                {% for field in link_form %}
-                <div class="field">
-                    <label>{{ field.label }}</label>
-                    {{ field }}
-                    {% for err in field.errors %}<div style="color:var(--bad); font-size:0.82rem;">{{ err }}</div>{% endfor %}
-                </div>
-                {% endfor %}
-                <button type="submit" class="btn btn-primary">Link Project</button>
-            </form>
-        </div>
-    </section>
-
     <section class="panel panel-pad table-wrap" style="margin-bottom: 12px;">
         <h3 style="margin-top: 0;">Store Locations In {{ warehouse.name }}</h3>
         <table>
@@ -763,6 +714,61 @@
         {% endif %}
     </section>
 </div><!-- /tab-movements -->
+
+<!-- ══════════════════════════════════
+     TAB 5 — PRESETS
+     ══════════════════════════════════ -->
+<div id="tab-presets" class="wh-tab-panel">
+    <section class="panel panel-pad" style="margin-bottom: 12px;">
+        <h3 style="margin-top: 0;">Manage Warehouse Setup In One Place</h3>
+        <div class="form-grid">
+            <form class="form-block" method="post">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="create_store">
+                <h4>Create Store In This Warehouse</h4>
+                <p>Create HQ/Site store directly here and attach it to {{ warehouse.name }}.</p>
+                {% for field in store_form %}
+                <div class="field">
+                    <label>{{ field.label }}</label>
+                    {{ field }}
+                    {% for err in field.errors %}<div style="color:var(--bad); font-size:0.82rem;">{{ err }}</div>{% endfor %}
+                </div>
+                {% endfor %}
+                <button type="submit" class="btn btn-primary">Save Store</button>
+            </form>
+
+            <form class="form-block" method="post">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="create_bin">
+                <h4>Create Bin Hierarchy</h4>
+                <p>Define all 5 levels: Zone, Aisle, Rack, Shelf, and Bin.</p>
+                {% for field in bin_form %}
+                <div class="field">
+                    <label>{{ field.label }}</label>
+                    {{ field }}
+                    {% for err in field.errors %}<div style="color:var(--bad); font-size:0.82rem;">{{ err }}</div>{% endfor %}
+                </div>
+                {% endfor %}
+                <button type="submit" class="btn btn-primary">Save Bin</button>
+            </form>
+
+            <form class="form-block" method="post">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="link_project">
+                <h4>Link Project / Site</h4>
+                <p>Select from existing projects and map a site store to this warehouse.</p>
+                {% for field in link_form %}
+                <div class="field">
+                    <label>{{ field.label }}</label>
+                    {{ field }}
+                    {% for err in field.errors %}<div style="color:var(--bad); font-size:0.82rem;">{{ err }}</div>{% endfor %}
+                </div>
+                {% endfor %}
+                <button type="submit" class="btn btn-primary">Link Project</button>
+            </form>
+        </div>
+    </section>
+</div><!-- /tab-presets -->
 
 <!-- ── Allocation Modal ── -->
 <div id="allocModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:9000; align-items:center; justify-content:center;">
@@ -1615,7 +1621,7 @@ function restoreActiveTab() {
     } catch (e) {
         tab = null;
     }
-    var allowed = ['overview', 'materials', 'layout', 'movements'];
+    var allowed = ['overview', 'materials', 'layout', 'movements', 'presets'];
     if (allowed.indexOf(tab) === -1) return;
     var btn = document.querySelector('.wh-tab-btn[data-tab="' + tab + '"]');
     if (btn) switchTab(tab, btn);
