@@ -395,45 +395,22 @@
 
     function exportDialogPdf() {
         const rows = applyDialogFilters(activeRows);
-        const heading = title.textContent || 'Fleet KPI Details';
-        const nowText = new Date().toLocaleString();
-        const popup = window.open('', '_blank', 'noopener,noreferrer,width=980,height=760');
-        if (!popup) return;
+        const tableRows = rows.map(function (row) {
+            return [
+                row.name || '-',
+                row.location || '-',
+                (dueTypeLabels[row.due_type || 'other'] || '-'),
+                row.due_date || '-',
+                row.status || '-'
+            ];
+        });
 
-        let bodyRows = '';
-        if (!rows.length) {
-            bodyRows = '<tr><td colspan="5">No records match current filters.</td></tr>';
-        } else {
-            bodyRows = rows.map(function (row) {
-                return '<tr>'
-                    + '<td>' + escapeHtml(row.name || '-') + '</td>'
-                    + '<td>' + escapeHtml(row.location || '-') + '</td>'
-                    + '<td>' + escapeHtml(dueTypeLabels[row.due_type || 'other'] || '-') + '</td>'
-                    + '<td>' + escapeHtml(row.due_date || '-') + '</td>'
-                    + '<td>' + escapeHtml(row.status || '-') + '</td>'
-                    + '</tr>';
-            }).join('');
-        }
-
-        popup.document.write(
-            '<!doctype html><html><head><title>' + escapeHtml(heading) + ' - Fleet Export</title>'
-            + '<style>'
-            + 'body{font-family:Segoe UI,Arial,sans-serif;padding:24px;color:#1b2e3d}'
-            + 'h1{margin:0 0 8px;font-size:22px}'
-            + '.muted{color:#5e7384;font-size:13px;margin:2px 0}'
-            + 'table{width:100%;border-collapse:collapse;margin-top:14px;font-size:13px}'
-            + 'th,td{border:1px solid #d9e3ea;padding:8px;text-align:left;vertical-align:top}'
-            + 'th{background:#f3f7fa;color:#335164}'
-            + '</style></head><body>'
-            + '<h1>' + escapeHtml(heading) + '</h1>'
-            + '<div class="muted">Generated: ' + escapeHtml(nowText) + '</div>'
-            + '<div class="muted">Filtered rows: ' + rows.length + '</div>'
-            + '<table><thead><tr><th>Name</th><th>Location</th><th>Due Type</th><th>Due / Last Date</th><th>Status</th></tr></thead>'
-            + '<tbody>' + bodyRows + '</tbody></table>'
-            + '<script>window.onload=function(){window.print();};<\/script>'
-            + '</body></html>'
-        );
-        popup.document.close();
+        const url = new URL('{% url "card_export_pdf" %}', window.location.origin);
+        url.searchParams.set('title', title.textContent || 'Fleet KPI Details');
+        url.searchParams.set('page', document.querySelector('.title h1') ? document.querySelector('.title h1').textContent.trim() : 'Fleet Management');
+        url.searchParams.set('headers', JSON.stringify(['Name', 'Location', 'Due Type', 'Due / Last Date', 'Status']));
+        url.searchParams.set('rows', JSON.stringify(tableRows));
+        window.location.assign(url.toString());
     }
 
     function openDialog(key) {

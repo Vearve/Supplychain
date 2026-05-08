@@ -3438,6 +3438,114 @@ def delivery_note_pdf_view(request, pk):
 
 
 @login_required
+def card_export_pdf_view(request):
+    reportlab_modules = _load_reportlab_modules()
+    if reportlab_modules is None:
+        return HttpResponse("PDF export requires reportlab package.", status=501)
+
+    A4, mm, _, pdf_canvas = reportlab_modules
+
+    title = (request.GET.get("title") or "Card Details").strip()[:120]
+    value = (request.GET.get("value") or "").strip()
+    page_name = (request.GET.get("page") or "").strip()[:120]
+
+    headers = []
+    rows = []
+
+    headers_raw = request.GET.get("headers")
+    rows_raw = request.GET.get("rows")
+
+    if headers_raw:
+        try:
+            parsed_headers = json.loads(headers_raw)
+            if isinstance(parsed_headers, list):
+                headers = [str(item)[:80] for item in parsed_headers]
+        except Exception:
+            headers = []
+
+    if rows_raw:
+        try:
+            parsed_rows = json.loads(rows_raw)
+            if isinstance(parsed_rows, list):
+                for row in parsed_rows:
+                    if isinstance(row, list):
+                        rows.append([str(cell)[:140] for cell in row])
+        except Exception:
+            rows = []
+
+    buffer = BytesIO()
+    pdf = pdf_canvas.Canvas(buffer, pagesize=A4)
+    width, height = A4
+    y = height - 20 * mm
+
+    pdf.setFont("Helvetica-Bold", 16)
+    pdf.drawString(15 * mm, y, title)
+    y -= 7 * mm
+
+    pdf.setFont("Helvetica", 9)
+    pdf.drawString(15 * mm, y, f"Generated: {timezone.localtime().strftime('%Y-%m-%d %H:%M:%S')}")
+    y -= 5 * mm
+    if page_name:
+        pdf.drawString(15 * mm, y, f"Page: {page_name}")
+        y -= 7 * mm
+    else:
+        y -= 2 * mm
+
+    if value:
+        pdf.setFont("Helvetica-Bold", 11)
+        pdf.drawString(15 * mm, y, "Value")
+        y -= 5 * mm
+        pdf.setFont("Helvetica", 11)
+        pdf.drawString(15 * mm, y, value)
+        y -= 9 * mm
+
+    if headers and rows:
+        cols = max(len(headers), 1)
+        table_left = 15 * mm
+        table_right = 195 * mm
+        table_width = table_right - table_left
+        col_width = table_width / cols
+
+        def draw_table_header(pos_y):
+            pdf.setFont("Helvetica-Bold", 9)
+            for idx, head in enumerate(headers):
+                x = table_left + (idx * col_width) + 1.5 * mm
+                pdf.drawString(x, pos_y, head)
+            line_y = pos_y - 2 * mm
+            pdf.line(table_left, line_y, table_right, line_y)
+            return line_y - 4 * mm
+
+        y = draw_table_header(y)
+        pdf.setFont("Helvetica", 9)
+        row_height = 6 * mm
+
+        for row in rows:
+            if y < 20 * mm:
+                pdf.showPage()
+                y = height - 20 * mm
+                y = draw_table_header(y)
+                pdf.setFont("Helvetica", 9)
+
+            for idx in range(cols):
+                cell = row[idx] if idx < len(row) else ""
+                x = table_left + (idx * col_width) + 1.5 * mm
+                pdf.drawString(x, y, cell)
+            y -= row_height
+
+    pdf.showPage()
+    pdf.save()
+    buffer.seek(0)
+
+    safe_name = "".join(ch if ch.isalnum() or ch in {"-", "_"} else "_" for ch in title.lower()).strip("_")
+    if not safe_name:
+        safe_name = "card_export"
+
+    response = HttpResponse(buffer.getvalue(), content_type="application/pdf")
+    response["Content-Disposition"] = f'attachment; filename="{safe_name}.pdf"'
+    return response
+
+
+@login_required
 def company_profile_view(request):
     _enforce_manage_access(request.user, "delivery")
     profile = CompanyProfile.objects.first() or CompanyProfile()

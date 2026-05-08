@@ -967,34 +967,11 @@
 
         function exportCardDialogPdf(payload) {
             if (!payload) return;
-            const now = new Date();
-            const timeText = now.toLocaleString();
-            const pageTitle = document.title || 'Supply Chain';
-            const labelEsc = (payload.label || 'KPI').replace(/[&<>"']/g, function (char) {
-                return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char];
-            });
-            const valueEsc = String(payload.value || '-').replace(/[&<>"']/g, function (char) {
-                return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char];
-            });
-
-            const popup = window.open('', '_blank', 'noopener,noreferrer,width=900,height=700');
-            if (!popup) return;
-
-            popup.document.write(
-                '<!doctype html><html><head><title>' + labelEsc + ' - KPI Export</title>'
-                + '<style>body{font-family:Segoe UI,Arial,sans-serif;padding:24px;color:#1b2e3d}'
-                + 'h1{margin:0 0 8px;font-size:22px} .muted{color:#5e7384;font-size:13px}'
-                + '.card{margin-top:16px;border:1px solid #d9e3ea;border-radius:10px;padding:14px}'
-                + '.k{color:#5e7384;font-size:13px;margin-bottom:6px}.v{font-size:24px;font-weight:700}'
-                + '</style></head><body>'
-                + '<h1>' + labelEsc + '</h1>'
-                + '<div class="muted">Page: ' + pageTitle + '</div>'
-                + '<div class="muted">Generated: ' + timeText + '</div>'
-                + '<div class="card"><div class="k">Value</div><div class="v">' + valueEsc + '</div></div>'
-                + '<script>window.onload=function(){window.print();};<\/script>'
-                + '</body></html>'
-            );
-            popup.document.close();
+            const url = new URL('{% url "card_export_pdf" %}', window.location.origin);
+            url.searchParams.set('title', payload.label || 'KPI');
+            url.searchParams.set('value', payload.value || '-');
+            url.searchParams.set('page', payload.page || (document.title || 'Supply Chain'));
+            window.location.assign(url.toString());
         }
 
         if (cardDialogOverlay && cardDialogClose && cardDialogTitle && cardDialogMeta && metricCards.length) {

@@ -54,6 +54,7 @@ urlpatterns = [
     path('workspace/delivery-notes/<int:pk>/edit/', views.delivery_note_update_view, name='delivery_note_update'),
     path('workspace/delivery-notes/<int:pk>/delete/', views.delivery_note_delete_view, name='delivery_note_delete'),
     path('workspace/delivery-notes/<int:pk>/pdf/', views.delivery_note_pdf_view, name='delivery_note_pdf'),
+    path('workspace/export/card/pdf/', views.card_export_pdf_view, name='card_export_pdf'),
     path('workspace/delivery-notes/company-profile/', views.company_profile_view, name='company_profile'),
     path('workspace/roles/', views.role_management_view, name='role_management'),
     path('workspace/audit-log/', views.audit_log_view, name='audit_log'),
