@@ -360,7 +360,15 @@
         }
 
         .table-wrap {
+            --table-max-visible-rows: 20;
+            --table-row-height: 42px;
+            --table-header-height: 44px;
             overflow-x: auto;
+            overflow-y: auto;
+            max-height: min(
+                calc(var(--table-header-height) + (var(--table-max-visible-rows) * var(--table-row-height))),
+                72vh
+            );
         }
 
         table {
@@ -381,7 +389,7 @@
             background: #f3f7fa;
             position: sticky;
             top: 0;
-            z-index: 1;
+            z-index: 2;
         }
 
         .cards {
@@ -438,6 +446,70 @@
         .badge-danger { background: #fdecef; color: #b21f35; }
         .badge-neutral { background: #edf3f7; color: #5e7384; }
 
+        .metric-card-click {
+            cursor: pointer;
+            transition: transform 0.12s ease, box-shadow 0.12s ease;
+        }
+
+        .metric-card-click:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 3px 14px #00000012;
+        }
+
+        .card-dialog-overlay {
+            position: fixed;
+            inset: 0;
+            background: #00000057;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 70;
+            padding: 16px;
+        }
+
+        .card-dialog-box {
+            width: min(680px, 96vw);
+            max-height: 82vh;
+            overflow: auto;
+            background: var(--card);
+            border-radius: 14px;
+            border: 1px solid var(--line);
+            padding: 14px;
+        }
+
+        .card-dialog-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .card-dialog-meta {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .card-dialog-meta .item {
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            padding: 10px;
+        }
+
+        .card-dialog-meta .item .k {
+            font-size: 0.82rem;
+            color: var(--muted);
+            margin-bottom: 4px;
+        }
+
+        .card-dialog-meta .item .v {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--ink);
+        }
+
         html[data-theme='dark'] body {
             color: #d7e4ee;
             background: linear-gradient(180deg, #0f1419 0%, #101a22 55%, #0f171f 100%);
@@ -458,6 +530,19 @@
             border-color: #253443;
             color: #d7e4ee;
             box-shadow: none;
+        }
+
+        html[data-theme='dark'] .card-dialog-box {
+            background: #14202a;
+            border-color: #253443;
+        }
+
+        html[data-theme='dark'] .card-dialog-meta .item {
+            border-color: #253443;
+        }
+
+        html[data-theme='dark'] .card-dialog-meta .item .v {
+            color: #d7e4ee;
         }
 
         html[data-theme='dark'] th {
@@ -745,6 +830,18 @@
     </div>
     <div class="sidebar-overlay" id="sidebar-overlay"></div>
     <div class="filter-overlay" id="filter-overlay"></div>
+    <div class="card-dialog-overlay" id="card-dialog-overlay" aria-hidden="true">
+        <div class="card-dialog-box" role="dialog" aria-modal="true" aria-labelledby="card-dialog-title">
+            <div class="card-dialog-head">
+                <h3 id="card-dialog-title" style="margin:0;">Card Details</h3>
+                <button type="button" class="btn btn-neutral" id="card-dialog-close">Close</button>
+            </div>
+            <div class="card-dialog-meta" id="card-dialog-meta"></div>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                <button type="button" class="btn btn-primary" id="card-dialog-export-pdf">Export PDF</button>
+            </div>
+        </div>
+    </div>
     <script>
     (function () {
         const sidebarToggle = document.getElementById('sidebar-toggle');
@@ -836,6 +933,125 @@
         document.addEventListener('keydown', function (event) {
             if (event.key === 'Escape') closeSidebar();
         });
+
+        const cardDialogOverlay = document.getElementById('card-dialog-overlay');
+        const cardDialogClose = document.getElementById('card-dialog-close');
+        const cardDialogTitle = document.getElementById('card-dialog-title');
+        const cardDialogMeta = document.getElementById('card-dialog-meta');
+        const cardDialogExportPdf = document.getElementById('card-dialog-export-pdf');
+        const metricCards = document.querySelectorAll('.metric:not(.kpi-click)');
+        let activeCardPayload = null;
+
+        function buildMetaItem(label, value) {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'item';
+
+            const key = document.createElement('div');
+            key.className = 'k';
+            key.textContent = label;
+
+            const val = document.createElement('div');
+            val.className = 'v';
+            val.textContent = value || '-';
+
+            wrapper.appendChild(key);
+            wrapper.appendChild(val);
+            return wrapper;
+        }
+
+        function closeCardDialog() {
+            if (!cardDialogOverlay) return;
+            cardDialogOverlay.style.display = 'none';
+            cardDialogOverlay.setAttribute('aria-hidden', 'true');
+        }
+
+        function exportCardDialogPdf(payload) {
+            if (!payload) return;
+            const now = new Date();
+            const timeText = now.toLocaleString();
+            const pageTitle = document.title || 'Supply Chain';
+            const labelEsc = (payload.label || 'KPI').replace(/[&<>"']/g, function (char) {
+                return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char];
+            });
+            const valueEsc = String(payload.value || '-').replace(/[&<>"']/g, function (char) {
+                return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char];
+            });
+
+            const popup = window.open('', '_blank', 'noopener,noreferrer,width=900,height=700');
+            if (!popup) return;
+
+            popup.document.write(
+                '<!doctype html><html><head><title>' + labelEsc + ' - KPI Export</title>'
+                + '<style>body{font-family:Segoe UI,Arial,sans-serif;padding:24px;color:#1b2e3d}'
+                + 'h1{margin:0 0 8px;font-size:22px} .muted{color:#5e7384;font-size:13px}'
+                + '.card{margin-top:16px;border:1px solid #d9e3ea;border-radius:10px;padding:14px}'
+                + '.k{color:#5e7384;font-size:13px;margin-bottom:6px}.v{font-size:24px;font-weight:700}'
+                + '</style></head><body>'
+                + '<h1>' + labelEsc + '</h1>'
+                + '<div class="muted">Page: ' + pageTitle + '</div>'
+                + '<div class="muted">Generated: ' + timeText + '</div>'
+                + '<div class="card"><div class="k">Value</div><div class="v">' + valueEsc + '</div></div>'
+                + '<script>window.onload=function(){window.print();};<\/script>'
+                + '</body></html>'
+            );
+            popup.document.close();
+        }
+
+        if (cardDialogOverlay && cardDialogClose && cardDialogTitle && cardDialogMeta && metricCards.length) {
+            metricCards.forEach(function (card) {
+                const labelEl = card.querySelector('.label');
+                const valueEl = card.querySelector('.value');
+                if (!labelEl || !valueEl) return;
+
+                card.classList.add('metric-card-click');
+                card.tabIndex = 0;
+                card.setAttribute('role', 'button');
+                card.setAttribute('aria-label', 'Open details for ' + labelEl.textContent.trim());
+
+                function openMetricDialog() {
+                    const payload = {
+                        label: labelEl.textContent.trim(),
+                        value: valueEl.textContent.trim(),
+                        page: document.querySelector('.title h1') ? document.querySelector('.title h1').textContent.trim() : document.title,
+                        generated: new Date().toLocaleString(),
+                    };
+
+                    activeCardPayload = payload;
+                    cardDialogTitle.textContent = payload.label;
+                    cardDialogMeta.innerHTML = '';
+                    cardDialogMeta.appendChild(buildMetaItem('Value', payload.value));
+                    cardDialogMeta.appendChild(buildMetaItem('Page', payload.page));
+                    cardDialogMeta.appendChild(buildMetaItem('Generated', payload.generated));
+                    cardDialogOverlay.style.display = 'flex';
+                    cardDialogOverlay.setAttribute('aria-hidden', 'false');
+                }
+
+                card.addEventListener('click', openMetricDialog);
+                card.addEventListener('keydown', function (event) {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        openMetricDialog();
+                    }
+                });
+            });
+
+            cardDialogClose.addEventListener('click', closeCardDialog);
+            cardDialogOverlay.addEventListener('click', function (event) {
+                if (event.target === cardDialogOverlay) closeCardDialog();
+            });
+
+            if (cardDialogExportPdf) {
+                cardDialogExportPdf.addEventListener('click', function () {
+                    exportCardDialogPdf(activeCardPayload);
+                });
+            }
+
+            document.addEventListener('keydown', function (event) {
+                if (event.key === 'Escape' && cardDialogOverlay.style.display === 'flex') {
+                    closeCardDialog();
+                }
+            });
+        }
     })();
     </script>
     {% block scripts %}{% endblock %}
