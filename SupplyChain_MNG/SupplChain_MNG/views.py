@@ -3461,7 +3461,34 @@ def delivery_notes_view(request):
 
         return redirect("delivery_notes")
 
-    context["rows"] = DeliveryNote.objects.select_related("source_requisition").prefetch_related("items__material").order_by("-created_at")
+    # Filtering
+    qs = DeliveryNote.objects.select_related("source_requisition").prefetch_related("items__material")
+    f_status = request.GET.get("status", "").strip()
+    f_date_from = request.GET.get("date_from", "").strip()
+    f_date_to = request.GET.get("date_to", "").strip()
+    f_search = request.GET.get("search", "").strip()
+    if f_status:
+        qs = qs.filter(status=f_status)
+    if f_date_from:
+        try:
+            qs = qs.filter(date_issued__gte=datetime.strptime(f_date_from, "%Y-%m-%d").date())
+        except ValueError:
+            pass
+    if f_date_to:
+        try:
+            qs = qs.filter(date_issued__lte=datetime.strptime(f_date_to, "%Y-%m-%d").date())
+        except ValueError:
+            pass
+    if f_search:
+        qs = qs.filter(note_number__icontains=f_search)
+    context["rows"] = qs.order_by("-date_issued", "-created_at")
+    context["filter_status"] = f_status
+    context["filter_date_from"] = f_date_from
+    context["filter_date_to"] = f_date_to
+    context["filter_search"] = f_search
+    context["status_choices"] = DeliveryNote.STATUS_CHOICES if hasattr(DeliveryNote, "STATUS_CHOICES") else [
+        ("DRAFT", "Draft"), ("APPROVED", "Approved"), ("DISPATCHED", "Dispatched"), ("RECEIVED", "Received"), ("CANCELLED", "Cancelled"),
+    ]
     return render(request, "SupplChain_MNG/delivery_notes.html", context)
 
 

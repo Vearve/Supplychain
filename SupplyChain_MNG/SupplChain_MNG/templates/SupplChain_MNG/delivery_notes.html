@@ -11,6 +11,36 @@
     {% endif %}
 </div>
 
+<div class="panel panel-pad" style="margin-bottom: 12px;">
+    <form method="get" style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
+        <div style="display:flex; flex-direction:column; gap:3px;">
+            <label style="font-size:0.8rem; font-weight:600; color:var(--text-muted);">Search Note #</label>
+            <input type="text" name="search" value="{{ filter_search }}" placeholder="Note number..." style="padding:6px 10px; border:1px solid var(--border); border-radius:6px; background:var(--bg-card); color:var(--text); font-size:0.87rem; min-width:150px;">
+        </div>
+        <div style="display:flex; flex-direction:column; gap:3px;">
+            <label style="font-size:0.8rem; font-weight:600; color:var(--text-muted);">Status</label>
+            <select name="status" style="padding:6px 10px; border:1px solid var(--border); border-radius:6px; background:var(--bg-card); color:var(--text); font-size:0.87rem;">
+                <option value="">All Statuses</option>
+                {% for val, label in status_choices %}
+                <option value="{{ val }}" {% if filter_status == val %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:3px;">
+            <label style="font-size:0.8rem; font-weight:600; color:var(--text-muted);">Date From</label>
+            <input type="date" name="date_from" value="{{ filter_date_from }}" style="padding:6px 10px; border:1px solid var(--border); border-radius:6px; background:var(--bg-card); color:var(--text); font-size:0.87rem;">
+        </div>
+        <div style="display:flex; flex-direction:column; gap:3px;">
+            <label style="font-size:0.8rem; font-weight:600; color:var(--text-muted);">Date To</label>
+            <input type="date" name="date_to" value="{{ filter_date_to }}" style="padding:6px 10px; border:1px solid var(--border); border-radius:6px; background:var(--bg-card); color:var(--text); font-size:0.87rem;">
+        </div>
+        <div style="display:flex; gap:6px; align-items:flex-end;">
+            <button type="submit" class="btn btn-primary" style="padding:6px 16px;">Filter</button>
+            <a href="{% url 'delivery_notes' %}" class="btn btn-neutral" style="padding:6px 16px;">Clear</a>
+        </div>
+    </form>
+</div>
+
 <div class="panel panel-pad table-wrap">
     <table>
         <thead>
@@ -30,7 +60,7 @@
             {% for note in rows %}
             <tr>
                 <td>{{ note.note_number }}</td>
-                <td>{{ note.date_issued|date:'Y-m-d' }}</td>
+                <td>{{ note.date_issued|date:'d/m/Y' }}</td>
                 <td>{{ note.from_location }}</td>
                 <td>{{ note.to_location }}</td>
                 <td>{{ note.source_requisition.id|default:'-' }}</td>
@@ -78,7 +108,7 @@
                 </td>
             </tr>
             {% empty %}
-            <tr><td colspan="9">No delivery notes yet.</td></tr>
+            <tr><td colspan="9">No delivery notes found{% if filter_status or filter_date_from or filter_date_to or filter_search %} matching current filters{% endif %}.</td></tr>
             {% endfor %}
         </tbody>
     </table>
