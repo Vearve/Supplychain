@@ -837,6 +837,12 @@
                 <button type="button" class="btn btn-neutral" id="card-dialog-close">Close</button>
             </div>
             <div class="card-dialog-meta" id="card-dialog-meta"></div>
+            <div class="table-wrap" id="card-dialog-table-wrap" style="display:none; margin-bottom:12px;">
+                <table>
+                    <thead id="card-dialog-table-head"></thead>
+                    <tbody id="card-dialog-table-body"></tbody>
+                </table>
+            </div>
             <div style="display:flex; gap:8px; flex-wrap:wrap;">
                 <button type="button" class="btn btn-primary" id="card-dialog-export-pdf">Export PDF</button>
             </div>
@@ -938,8 +944,12 @@
         const cardDialogClose = document.getElementById('card-dialog-close');
         const cardDialogTitle = document.getElementById('card-dialog-title');
         const cardDialogMeta = document.getElementById('card-dialog-meta');
+        const cardDialogTableWrap = document.getElementById('card-dialog-table-wrap');
+        const cardDialogTableHead = document.getElementById('card-dialog-table-head');
+        const cardDialogTableBody = document.getElementById('card-dialog-table-body');
         const cardDialogExportPdf = document.getElementById('card-dialog-export-pdf');
         const metricCards = document.querySelectorAll('.metric:not(.kpi-click)');
+        const pageCardDialogData = window.cardDialogData || {};
         let activeCardPayload = null;
 
         function buildMetaItem(label, value) {
@@ -971,7 +981,39 @@
             url.searchParams.set('title', payload.label || 'KPI');
             url.searchParams.set('value', payload.value || '-');
             url.searchParams.set('page', payload.page || (document.title || 'Supply Chain'));
+            if (payload.headers && payload.headers.length) {
+                url.searchParams.set('headers', JSON.stringify(payload.headers));
+            }
+            if (payload.rows && payload.rows.length) {
+                url.searchParams.set('rows', JSON.stringify(payload.rows));
+            }
             window.location.assign(url.toString());
+        }
+
+        function renderCardTable(headers, rows) {
+            if (!cardDialogTableWrap || !cardDialogTableHead || !cardDialogTableBody) return;
+            if (!headers || !headers.length) {
+                cardDialogTableWrap.style.display = 'none';
+                cardDialogTableHead.innerHTML = '';
+                cardDialogTableBody.innerHTML = '';
+                return;
+            }
+
+            cardDialogTableWrap.style.display = 'block';
+            cardDialogTableHead.innerHTML = '<tr>' + headers.map(function (h) {
+                return '<th>' + h + '</th>';
+            }).join('') + '</tr>';
+
+            if (!rows || !rows.length) {
+                cardDialogTableBody.innerHTML = '<tr><td colspan="' + headers.length + '">No records found.</td></tr>';
+                return;
+            }
+
+            cardDialogTableBody.innerHTML = rows.map(function (row) {
+                return '<tr>' + headers.map(function (_, idx) {
+                    return '<td>' + (row[idx] !== undefined && row[idx] !== null ? row[idx] : '-') + '</td>';
+                }).join('') + '</tr>';
+            }).join('');
         }
 
         if (cardDialogOverlay && cardDialogClose && cardDialogTitle && cardDialogMeta && metricCards.length) {
@@ -986,11 +1028,15 @@
                 card.setAttribute('aria-label', 'Open details for ' + labelEl.textContent.trim());
 
                 function openMetricDialog() {
+                    const cardKey = card.getAttribute('data-dialog-key') || '';
+                    const detail = pageCardDialogData[cardKey] || null;
                     const payload = {
                         label: labelEl.textContent.trim(),
                         value: valueEl.textContent.trim(),
                         page: document.querySelector('.title h1') ? document.querySelector('.title h1').textContent.trim() : document.title,
                         generated: new Date().toLocaleString(),
+                        headers: detail && detail.headers ? detail.headers : [],
+                        rows: detail && detail.rows ? detail.rows : [],
                     };
 
                     activeCardPayload = payload;
@@ -999,6 +1045,7 @@
                     cardDialogMeta.appendChild(buildMetaItem('Value', payload.value));
                     cardDialogMeta.appendChild(buildMetaItem('Page', payload.page));
                     cardDialogMeta.appendChild(buildMetaItem('Generated', payload.generated));
+                    renderCardTable(payload.headers, payload.rows);
                     cardDialogOverlay.style.display = 'flex';
                     cardDialogOverlay.setAttribute('aria-hidden', 'false');
                 }

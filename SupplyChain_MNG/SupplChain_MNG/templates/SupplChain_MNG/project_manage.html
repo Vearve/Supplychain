@@ -82,6 +82,13 @@
         padding: 4px 10px;
         font-size: 0.82rem;
         font-weight: 600;
+        cursor: pointer;
+    }
+
+    .store-chip.active {
+        background: #d5ecf8;
+        border-color: #9ccde8;
+        color: #114563;
     }
 </style>
 {% endblock %}
@@ -135,9 +142,30 @@
     <strong style="font-size:0.9rem; color:var(--ink);">Linked Store Locations</strong>
     <div class="stores-list" style="margin-top:8px;">
         {% for store in project_stores %}
-        <span class="store-chip">{{ store.name }}{% if store.location_type %} · {{ store.get_location_type_display }}{% endif %}</span>
+        <span class="store-chip" data-store-chip="{{ store.id }}">{{ store.name }}{% if store.location_type %} · {{ store.get_location_type_display }}{% endif %}</span>
         {% endfor %}
     </div>
+</div>
+
+<div class="panel panel-pad table-wrap" style="margin-bottom: 16px;">
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px; flex-wrap:wrap;">
+        <strong id="storeMaterialTitle" style="font-size:0.92rem; color:var(--ink);">Store Materials</strong>
+        <span style="color:var(--muted); font-size:0.82rem;">Issuing materials reduces this table automatically after refresh.</span>
+    </div>
+    <table class="doc-table" id="storeMaterialsTable">
+        <thead>
+            <tr>
+                <th>Material</th>
+                <th>Code</th>
+                <th>On Hand</th>
+                <th>Reserved</th>
+                <th>Available</th>
+            </tr>
+        </thead>
+        <tbody id="storeMaterialsBody">
+            <tr><td colspan="5" style="color:var(--muted);">Select a store above to view materials.</td></tr>
+        </tbody>
+    </table>
 </div>
 {% endif %}
 
@@ -346,4 +374,50 @@
     {% endif %}
 </div>
 
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    const storeMaterialsData = JSON.parse('{{ store_materials_dialog_json|escapejs }}');
+    const chips = Array.from(document.querySelectorAll('[data-store-chip]'));
+    const titleEl = document.getElementById('storeMaterialTitle');
+    const bodyEl = document.getElementById('storeMaterialsBody');
+
+    if (!chips.length || !titleEl || !bodyEl) return;
+
+    function renderStore(storeId) {
+        chips.forEach(function (chip) {
+            chip.classList.toggle('active', chip.getAttribute('data-store-chip') === storeId);
+        });
+
+        const payload = storeMaterialsData[storeId];
+        const storeName = payload && payload.store_name ? payload.store_name : 'Store Materials';
+        titleEl.textContent = storeName + ' Materials';
+
+        if (!payload || !payload.rows || !payload.rows.length) {
+            bodyEl.innerHTML = '<tr><td colspan="5" style="color:var(--muted);">No stock in this store yet.</td></tr>';
+            return;
+        }
+
+        bodyEl.innerHTML = payload.rows.map(function (row) {
+            return '<tr>'
+                + '<td>' + row[0] + '</td>'
+                + '<td>' + row[1] + '</td>'
+                + '<td>' + row[2] + '</td>'
+                + '<td>' + row[3] + '</td>'
+                + '<td>' + row[4] + '</td>'
+                + '</tr>';
+        }).join('');
+    }
+
+    chips.forEach(function (chip) {
+        chip.addEventListener('click', function () {
+            renderStore(chip.getAttribute('data-store-chip'));
+        });
+    });
+
+    renderStore(chips[0].getAttribute('data-store-chip'));
+})();
+</script>
 {% endblock %}

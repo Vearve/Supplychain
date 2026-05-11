@@ -890,13 +890,17 @@
             <!-- Material — searchable typeahead -->
             <div class="field" style="margin-bottom:10px;">
                 <label style="display:block; margin-bottom:4px; font-size:0.85rem; color:var(--muted);">Material</label>
-                <div style="position:relative;">
-                    <input type="text" id="allocMatSearch" autocomplete="off" placeholder="Type to search materials…"
-                        style="width:100%; padding:7px 10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--text); font-size:0.9rem; box-sizing:border-box;"
-                        oninput="filterMatList(this.value)" onfocus="showMatList()" onblur="scheduleHideMatList()">
-                    <input type="hidden" name="alloc_material" id="allocMaterialHidden" required>
-                    <div id="matDropdown" style="display:none; position:absolute; top:100%; left:0; right:0; max-height:200px; overflow-y:auto; background:var(--card); border:1px solid var(--line); border-radius:0 0 8px 8px; z-index:9100; box-shadow:0 4px 16px rgba(0,0,0,0.15);">
+                <div style="display:flex; gap:6px; align-items:flex-start;">
+                    <div style="position:relative; flex:1;">
+                        <input type="text" id="allocMatSearch" autocomplete="off" placeholder="Type to search materials…"
+                            style="width:100%; padding:7px 10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--text); font-size:0.9rem; box-sizing:border-box;"
+                            oninput="filterMatList(this.value)" onfocus="showMatList()" onblur="scheduleHideMatList()">
+                        <input type="hidden" name="alloc_material" id="allocMaterialHidden" required>
+                        <div id="matDropdown" style="display:none; position:absolute; top:100%; left:0; right:0; max-height:200px; overflow-y:auto; background:var(--card); border:1px solid var(--line); border-radius:0 0 8px 8px; z-index:9100; box-shadow:0 4px 16px rgba(0,0,0,0.15);">
+                        </div>
                     </div>
+                    <button type="button" title="Quick-create a new material" onclick="openQC('material')"
+                        style="padding:7px 11px; border:1px solid var(--line); border-radius:8px; background:var(--card); color:var(--brand); font-size:1.1rem; cursor:pointer; white-space:nowrap;">＋</button>
                 </div>
             </div>
 
@@ -1012,6 +1016,7 @@
 <script>
 const STORES_BINS = JSON.parse('{{ stores_bins_json|escapejs }}');
 const ALL_MATERIALS = JSON.parse('{{ all_materials_json|escapejs }}');
+const MATERIAL_CATEGORIES = JSON.parse('{{ material_category_rows|escapejs }}');
 const WAREHOUSE_STOCK_SPLIT = JSON.parse('{{ warehouse_stock_split_json|escapejs }}');
 const WAREHOUSE_MOVEMENT_TIMELINE = JSON.parse('{{ warehouse_movement_timeline_json|escapejs }}');
 const WAREHOUSE_MATERIAL_FLOW = JSON.parse('{{ warehouse_material_flow_json|escapejs }}');
@@ -1357,6 +1362,41 @@ var _qcConfig = {
             // Also add empty bin slot so cascadeZone works (user must then create bin)
             if (!STORES_BINS[data.id]) STORES_BINS[data.id] = [];
             cascadeZone();
+        }
+    },
+    material: {
+        title: 'Create New Material',
+        endpoint: function(){ return '/workspace/warehouse-management/' + WH_PK + '/quick-create/material/'; },
+        fields: function() {
+            var catOptions = MATERIAL_CATEGORIES.map(function(c) {
+                return '<option value="' + c.id + '">' + c.name + '</option>';
+            }).join('');
+            return '<div style="margin-bottom:8px;"><label style="display:block;font-size:0.85rem;color:var(--muted);margin-bottom:3px;">Material Name <span style="color:var(--bad);">*</span></label>' +
+                '<input type="text" id="qcMatName" placeholder="e.g. Adapter" style="width:100%;padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text);font-size:0.9rem;box-sizing:border-box;"></div>' +
+                '<div style="margin-bottom:8px;"><label style="display:block;font-size:0.85rem;color:var(--muted);margin-bottom:3px;">Code Number</label>' +
+                '<input type="text" id="qcMatCode" placeholder="Leave blank for auto-code" style="width:100%;padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text);font-size:0.9rem;box-sizing:border-box;"></div>' +
+                '<div style="margin-bottom:8px;"><label style="display:block;font-size:0.85rem;color:var(--muted);margin-bottom:3px;">Category <span style="color:var(--bad);">*</span></label>' +
+                '<select id="qcMatCategory" style="width:100%;padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text);font-size:0.9rem;">' +
+                '<option value="">— Select category —</option>' + catOptions + '</select></div>' +
+                '<div style="margin-bottom:8px;"><label style="display:block;font-size:0.85rem;color:var(--muted);margin-bottom:3px;">Measurement Unit</label>' +
+                '<select id="qcMatMeasure" style="width:100%;padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text);font-size:0.9rem;">' +
+                '<option value="UNIT">Units</option><option value="KG">Kilograms</option><option value="G">Grams</option><option value="L">Litres</option><option value="ML">Millilitres</option><option value="TON">Tonnes</option>' +
+                '</select></div>' +
+                '<div style="margin-bottom:8px;"><label style="display:block;font-size:0.85rem;color:var(--muted);margin-bottom:3px;">Display Unit <span style="color:var(--bad);">*</span></label>' +
+                '<input type="text" id="qcMatUnit" placeholder="e.g. pcs, box, kg" style="width:100%;padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text);font-size:0.9rem;box-sizing:border-box;"></div>';
+        },
+        payload: function() {
+            var fd = new FormData();
+            fd.append('name', document.getElementById('qcMatName').value.trim());
+            fd.append('code_number', document.getElementById('qcMatCode').value.trim());
+            fd.append('category_id', document.getElementById('qcMatCategory').value);
+            fd.append('measurement_unit', document.getElementById('qcMatMeasure').value);
+            fd.append('unit', document.getElementById('qcMatUnit').value.trim());
+            return fd;
+        },
+        onSuccess: function(data) {
+            ALL_MATERIALS.push({id: data.id, name: data.name, code_number: data.code_number});
+            selectMat({id: data.id, name: data.name, code_number: data.code_number});
         }
     },
     bin: {

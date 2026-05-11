@@ -746,8 +746,9 @@ def workspace_home(request):
     recent_transactions = transactions.order_by("-date")[:10]
 
     category_counts = list(
-        materials.values("category__name").annotate(material_count=Count("id")).order_by("category__name")
+        Category.objects.annotate(material_count=Count("material")).values("name", "material_count").order_by("name")
     )
+    unassigned_category_count = materials.filter(category__isnull=True).count()
     transaction_counts = list(
         transactions.values("transaction_type").annotate(count=Count("id")).order_by("transaction_type")
     )
@@ -755,6 +756,125 @@ def workspace_home(request):
         requisitions.values("department").annotate(count=Count("id")).order_by("department")
     )
     material_counts = list(materials.values("name", "quantity").order_by("-quantity")[:10])
+
+    material_locations_map = {}
+    for bal in InventoryBalance.objects.select_related("storage_bin", "storage_bin__store_location", "material").filter(
+        material_id__in=materials.values_list("id", flat=True),
+        on_hand__gt=0,
+    ):
+        loc_parts = [
+            bal.storage_bin.store_location.name if bal.storage_bin and bal.storage_bin.store_location_id else "",
+            bal.storage_bin.zone if bal.storage_bin else "",
+            bal.storage_bin.aisle if bal.storage_bin else "",
+            bal.storage_bin.rack if bal.storage_bin else "",
+            bal.storage_bin.shelf if bal.storage_bin else "",
+            bal.storage_bin.bin_code if bal.storage_bin else "",
+        ]
+        loc_text = " / ".join([part for part in loc_parts if part])
+        if not loc_text:
+            continue
+        material_locations_map.setdefault(bal.material_id, set()).add(loc_text)
+
+    home_dialog_data = {
+        "total_materials": {
+            "headers": ["Material", "Code", "Category", "Quantity", "Min", "Allocated Places"],
+            "rows": [
+                [
+                    item.name,
+                    item.code_number or "-",
+                    item.category.name if item.category_id else "-",
+                    str(item.quantity),
+                    str(item.min_required),
+                    "; ".join(sorted(list(material_locations_map.get(item.id, set())))) or "-",
+                ]
+                for item in materials.select_related("category").order_by("name")
+            ],
+        },
+        "low_stock": {
+            "headers": ["Material", "Code", "Quantity", "Minimum"],
+            "rows": [
+                [item.name, item.code_number or "-", str(item.quantity), str(item.min_required)]
+                for item in low_stock
+            ],
+        },
+        "total_categories": {
+            "headers": ["Category", "Materials"],
+            "rows": (
+                [[row["name"], str(row["material_count"])] for row in category_counts]
+                + ([["Unassigned", str(unassigned_category_count)]] if unassigned_category_count else [])
+            ),
+        },
+        "active_equipments": {
+            "headers": ["Equipment", "Serial", "Status", "Store"],
+            "rows": [
+                [
+                    item.name,
+                    item.serial_number or "-",
+                    item.get_status_display(),
+                    item.store_location.name if item.store_location_id else "-",
+                ]
+                for item in Equipment.objects.select_related("store_location").filter(is_active=True).order_by("name")
+            ],
+        },
+        "active_fleets": {
+            "headers": ["Vehicle", "Reg Number", "Status", "Store"],
+            "rows": [
+                [
+                    item.name,
+                    item.registration_number,
+                    item.get_status_display(),
+                    item.store_location.name if item.store_location_id else "-",
+                ]
+                for item in MobileEquipment.objects.select_related("store_location").filter(is_active=True).order_by("name")
+            ],
+        },
+        "total_requisitions": {
+            "headers": ["Ref", "Project", "Department", "Status", "Requested"],
+            "rows": [
+                [
+                    req.req_number or str(req.id),
+                    req.project.name if req.project_id else "-",
+                    req.department or "-",
+                    req.status,
+                    timezone.localtime(req.date_requested).strftime("%Y-%m-%d %H:%M") if req.date_requested else "-",
+                ]
+                for req in requisitions.select_related("project").order_by("-date_requested")
+            ],
+        },
+        "pending_requisitions": {
+            "headers": ["Ref", "Project", "Department", "Status", "Requested"],
+            "rows": [
+                [
+                    req.req_number or str(req.id),
+                    req.project.name if req.project_id else "-",
+                    req.department or "-",
+                    req.status,
+                    timezone.localtime(req.date_requested).strftime("%Y-%m-%d %H:%M") if req.date_requested else "-",
+                ]
+                for req in requisitions.select_related("project").filter(fulfilled=False).order_by("-date_requested")
+            ],
+        },
+        "stock_transactions": {
+            "headers": ["Date", "Material", "Type", "Qty", "User"],
+            "rows": [
+                [
+                    timezone.localtime(t.date).strftime("%Y-%m-%d %H:%M") if t.date else "-",
+                    t.material.name if t.material_id else "Unknown",
+                    t.get_transaction_type_display(),
+                    str(t.quantity),
+                    t.performed_by.username if t.performed_by_id else "N/A",
+                ]
+                for t in transactions.select_related("material", "performed_by").order_by("-date")
+            ],
+        },
+        "total_quantity": {
+            "headers": ["Material", "Quantity"],
+            "rows": [
+                [item.name, str(item.quantity)]
+                for item in materials.order_by("-quantity", "name")
+            ],
+        },
+    }
 
     context.update(
         {
@@ -773,6 +893,7 @@ def workspace_home(request):
             "transaction_counts_json": json.dumps(transaction_counts),
             "requisition_counts_json": json.dumps(requisition_counts),
             "material_counts_json": json.dumps(material_counts),
+            "home_dialog_data_json": json.dumps(home_dialog_data),
         }
     )
     return render(request, "SupplChain_MNG/workspace_home.html", context)
@@ -1827,6 +1948,7 @@ def warehouse_manage_view(request, pk):
             "warehouse_dn_received": dn_received_count,
             "recent_movements": recent_movements,
             "all_materials_json": json.dumps(all_materials),
+            "material_category_rows": list(Category.objects.order_by("name").values("id", "name")),
             "alloc_store_rows": alloc_store_rows,
             "stores_bins_json": json.dumps(stores_bins_json),
             "all_warehouses": all_warehouses,
@@ -1855,6 +1977,49 @@ def warehouse_quick_create_store(request, pk):
         is_active=True,
     )
     return JsonResponse({"id": store.id, "name": store.name})
+
+
+@login_required
+def warehouse_quick_create_material(request, pk):
+    """AJAX endpoint: create a Material and return JSON for allocation quick-add."""
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+    _enforce_manage_access(request.user, "warehouse")
+    get_object_or_404(Warehouse, pk=pk)
+
+    name = (request.POST.get("name") or "").strip()
+    code_number = (request.POST.get("code_number") or "").strip().upper()
+    unit = (request.POST.get("unit") or "").strip()
+    category_id = (request.POST.get("category_id") or "").strip()
+    measurement_unit = (request.POST.get("measurement_unit") or "UNIT").strip().upper() or "UNIT"
+
+    if not name:
+        return JsonResponse({"error": "Material name is required."}, status=400)
+    if not unit:
+        return JsonResponse({"error": "Unit is required."}, status=400)
+    if not category_id:
+        return JsonResponse({"error": "Category is required."}, status=400)
+
+    category = get_object_or_404(Category, pk=category_id)
+
+    if not code_number:
+        seed = "".join([c for c in name.upper() if c.isalnum()])[:6] or "MAT"
+        code_number = f"{seed}-{timezone.now().strftime('%y%m%d%H%M%S')}"
+
+    if Material.objects.filter(code_number=code_number).exists():
+        return JsonResponse({"error": f"Code number '{code_number}' already exists."}, status=400)
+
+    material = Material.objects.create(
+        name=name,
+        code_number=code_number,
+        category=category,
+        measurement_unit=measurement_unit,
+        quantity=0,
+        unit=unit,
+        min_required=0,
+    )
+
+    return JsonResponse({"id": material.id, "name": material.name, "code_number": material.code_number})
 
 
 def warehouse_next_bin_code(request, pk):
@@ -4117,6 +4282,46 @@ def project_manage_view(request, pk):
         .order_by("-date_requested")[:8]
     )
 
+    store_material_rows = list(
+        InventoryBalance.objects.filter(
+            storage_bin__store_location_id__in=project_store_ids,
+            on_hand__gt=0,
+        )
+        .values(
+            "storage_bin__store_location_id",
+            "storage_bin__store_location__name",
+            "material__name",
+            "material__code_number",
+        )
+        .annotate(
+            total_on_hand=Sum("on_hand"),
+            total_reserved=Sum("reserved"),
+        )
+        .order_by("storage_bin__store_location__name", "material__name")
+    )
+
+    store_materials_dialog = {}
+    for row in store_material_rows:
+        store_id = str(row["storage_bin__store_location_id"])
+        store_materials_dialog.setdefault(
+            store_id,
+            {
+                "store_name": row["storage_bin__store_location__name"],
+                "headers": ["Material", "Code", "On Hand", "Reserved", "Available"],
+                "rows": [],
+            },
+        )
+        available = (row["total_on_hand"] or Decimal("0")) - (row["total_reserved"] or Decimal("0"))
+        store_materials_dialog[store_id]["rows"].append(
+            [
+                row["material__name"],
+                row["material__code_number"] or "-",
+                str(row["total_on_hand"] or 0),
+                str(row["total_reserved"] or 0),
+                str(available),
+            ]
+        )
+
     context.update(
         {
             "project": project,
@@ -4131,6 +4336,7 @@ def project_manage_view(request, pk):
             "ppe_count": PPEIssue.objects.filter(store_location_id__in=project_store_ids).count(),
             "recent_reqs": recent_reqs,
             "req_count": Requisition.objects.filter(project=project).count(),
+            "store_materials_dialog_json": json.dumps(store_materials_dialog),
         }
     )
     return render(request, "SupplChain_MNG/project_manage.html", context)

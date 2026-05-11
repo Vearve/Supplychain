@@ -9,15 +9,15 @@
 
 {% block content %}
 <section class="cards" style="margin-bottom: 12px;">
-    <article class="metric"><div class="label">Total Materials</div><div class="value">{{ total_materials }}</div></article>
-    <article class="metric"><div class="label">Low Stock</div><div class="value">{{ low_stock_count }}</div></article>
-    <article class="metric"><div class="label">Total Categories</div><div class="value">{{ total_categories }}</div></article>
-    <article class="metric"><div class="label">Active Equipments</div><div class="value">{{ active_equipments }}</div></article>
-    <article class="metric"><div class="label">Active Fleets</div><div class="value">{{ active_fleets }}</div></article>
-    <article class="metric"><div class="label">Total Requisitions</div><div class="value">{{ total_requisitions }}</div></article>
-    <article class="metric"><div class="label">Pending Requisitions</div><div class="value">{{ pending_requisitions }}</div></article>
-    <article class="metric"><div class="label">Stock Transactions</div><div class="value">{{ total_transactions }}</div></article>
-    <article class="metric"><div class="label">Total Quantity</div><div class="value">{{ total_quantity }}</div></article>
+    <article class="metric" data-dialog-key="total_materials"><div class="label">Total Materials</div><div class="value">{{ total_materials }}</div></article>
+    <article class="metric" data-dialog-key="low_stock"><div class="label">Low Stock</div><div class="value">{{ low_stock_count }}</div></article>
+    <article class="metric" data-dialog-key="total_categories"><div class="label">Total Categories</div><div class="value">{{ total_categories }}</div></article>
+    <article class="metric" data-dialog-key="active_equipments"><div class="label">Active Equipments</div><div class="value">{{ active_equipments }}</div></article>
+    <article class="metric" data-dialog-key="active_fleets"><div class="label">Active Fleets</div><div class="value">{{ active_fleets }}</div></article>
+    <article class="metric" data-dialog-key="total_requisitions"><div class="label">Total Requisitions</div><div class="value">{{ total_requisitions }}</div></article>
+    <article class="metric" data-dialog-key="pending_requisitions"><div class="label">Pending Requisitions</div><div class="value">{{ pending_requisitions }}</div></article>
+    <article class="metric" data-dialog-key="stock_transactions"><div class="label">Stock Transactions</div><div class="value">{{ total_transactions }}</div></article>
+    <article class="metric" data-dialog-key="total_quantity"><div class="label">Total Quantity</div><div class="value">{{ total_quantity }}</div></article>
 </section>
 
 <section class="split" style="margin-bottom: 12px;">
@@ -89,6 +89,8 @@
 
 {% block scripts %}
 <script>
+    window.cardDialogData = JSON.parse('{{ home_dialog_data_json|escapejs }}');
+
     const categoryData = JSON.parse('{{ category_counts_json|escapejs }}');
     const transactionData = JSON.parse('{{ transaction_counts_json|escapejs }}');
     const requisitionData = JSON.parse('{{ requisition_counts_json|escapejs }}');
