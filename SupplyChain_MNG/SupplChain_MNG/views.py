@@ -3753,9 +3753,16 @@ def company_profile_view(request):
     profile = CompanyProfile.objects.first() or CompanyProfile()
     form = CompanyProfileForm(request.POST or None, request.FILES or None, instance=profile)
     if request.method == "POST" and form.is_valid():
-        saved_profile = form.save()
-        _log_action(request, "UPDATE", "CompanyProfile", saved_profile.id, "Updated delivery note company profile")
-        return redirect("delivery_notes")
+        try:
+            saved_profile = form.save()
+            _log_action(request, "UPDATE", "CompanyProfile", saved_profile.id, "Updated delivery note company profile")
+            messages.success(request, "Company profile saved successfully.")
+            return redirect("delivery_notes")
+        except OSError:
+            messages.error(
+                request,
+                "Could not save company logo to storage. Check persistent disk mount and PERSISTENT_ROOT settings."
+            )
 
     context = _base_context(request, "delivery")
     context.update({"form": form, "title": "Company Profile"})

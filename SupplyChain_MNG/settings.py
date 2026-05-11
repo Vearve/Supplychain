@@ -144,17 +144,22 @@ USE_PERSISTENT_DISK = os.getenv('USE_PERSISTENT_DISK', 'False').strip().lower() 
 MEDIA_URL = '/media/'
 if USE_PERSISTENT_DISK:
     MEDIA_ROOT = os.path.join(PERSISTENT_ROOT, 'media')
+    try:
+        os.makedirs(MEDIA_ROOT, exist_ok=True)
+    except OSError:
+        # Fallback when persistent disk is not mounted or is read-only.
+        MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 else:
     MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
-    STORAGES = {
-        'default': {
-            'BACKEND': 'django.core.files.storage.FileSystemStorage',
-        },
-        'staticfiles': {
-            'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
-        },
-    }
+STORAGES = {
+    'default': {
+        'BACKEND': 'django.core.files.storage.FileSystemStorage',
+    },
+    'staticfiles': {
+        'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
+    },
+}
 
 
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
