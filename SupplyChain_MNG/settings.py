@@ -130,22 +130,21 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
-# Render persistent disk path (set this in Render env vars, e.g. /var/data)
+
+# Static files should be collected into a build-writable path.
+# On Render, /var/data can be read-only during build, so do not use it for collectstatic.
+STATIC_URL = '/static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
+
+# Uploaded media can use Render persistent disk at runtime.
 PERSISTENT_ROOT = os.getenv('PERSISTENT_ROOT', '/var/data')
 USE_PERSISTENT_DISK = os.getenv('USE_PERSISTENT_DISK', 'False').strip().lower() in ('1', 'true', 'yes', 'on')
 
+MEDIA_URL = '/media/'
 if USE_PERSISTENT_DISK:
-    STATIC_URL = '/static/'
-    STATIC_ROOT = os.path.join(PERSISTENT_ROOT, 'staticfiles')
-    STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
-    MEDIA_URL = '/media/'
     MEDIA_ROOT = os.path.join(PERSISTENT_ROOT, 'media')
 else:
-    # Local file storage (development)
-    STATIC_URL = '/static/'
-    STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
-    STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
-    MEDIA_URL = '/media/'
     MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
     STORAGES = {
