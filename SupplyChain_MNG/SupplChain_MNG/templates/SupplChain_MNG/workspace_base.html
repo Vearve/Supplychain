@@ -949,7 +949,6 @@
         const cardDialogTableBody = document.getElementById('card-dialog-table-body');
         const cardDialogExportPdf = document.getElementById('card-dialog-export-pdf');
         const metricCards = document.querySelectorAll('.metric:not(.kpi-click)');
-        const pageCardDialogData = window.cardDialogData || {};
         let activeCardPayload = null;
 
         function buildMetaItem(label, value) {
@@ -1029,6 +1028,7 @@
 
                 function openMetricDialog() {
                     const cardKey = card.getAttribute('data-dialog-key') || '';
+                    const pageCardDialogData = window.cardDialogData || {};
                     const detail = pageCardDialogData[cardKey] || null;
                     const payload = {
                         label: labelEl.textContent.trim(),
@@ -1042,9 +1042,11 @@
                     activeCardPayload = payload;
                     cardDialogTitle.textContent = payload.label;
                     cardDialogMeta.innerHTML = '';
-                    cardDialogMeta.appendChild(buildMetaItem('Value', payload.value));
-                    cardDialogMeta.appendChild(buildMetaItem('Page', payload.page));
-                    cardDialogMeta.appendChild(buildMetaItem('Generated', payload.generated));
+                    if (!payload.headers || !payload.headers.length) {
+                        cardDialogMeta.appendChild(buildMetaItem('Value', payload.value));
+                        cardDialogMeta.appendChild(buildMetaItem('Page', payload.page));
+                        cardDialogMeta.appendChild(buildMetaItem('Generated', payload.generated));
+                    }
                     renderCardTable(payload.headers, payload.rows);
                     cardDialogOverlay.style.display = 'flex';
                     cardDialogOverlay.setAttribute('aria-hidden', 'false');
