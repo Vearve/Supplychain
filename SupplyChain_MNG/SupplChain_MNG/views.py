@@ -3,7 +3,7 @@ import csv
 import json
 import importlib
 import logging
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from io import BytesIO
 
 from django.contrib.auth import login, logout
@@ -1685,33 +1685,43 @@ def warehouse_manage_view(request, pk):
                 return redirect("warehouse_manage", pk=warehouse.pk)
             alloc_material = get_object_or_404(Material, pk=material_id)
             target_bin = get_object_or_404(StorageBin, pk=bin_id, store_location__warehouse=warehouse)
-            existing_balances = list(
-                InventoryBalance.objects.filter(
-                    material=alloc_material,
-                    storage_bin__store_location__warehouse=warehouse,
-                )
-            )
-            total_on_hand = sum(b.on_hand for b in existing_balances)
-            total_reserved = sum(b.reserved for b in existing_balances)
-            # Move any existing stock from other bins to the target bin
-            for b in existing_balances:
-                if b.storage_bin_id != target_bin.id:
-                    b.delete()
-            # Upsert balance at target bin (creates a zero-balance record if none existed)
+
+            try:
+                alloc_quantity = Decimal(str(request.POST.get("alloc_quantity") or "0"))
+                if alloc_quantity < 0:
+                    raise ValueError
+            except (ValueError, InvalidOperation):
+                messages.error(request, "Quantity must be a valid non-negative number.")
+                return redirect("warehouse_manage", pk=warehouse.pk)
+
+            alloc_notes = (request.POST.get("alloc_notes") or "").strip()
+
+            # Upsert balance at the target bin without disturbing other bin allocations
             target_balance, created = InventoryBalance.objects.get_or_create(
                 material=alloc_material,
                 storage_bin=target_bin,
-                defaults={"on_hand": total_on_hand, "reserved": total_reserved},
+                defaults={"on_hand": alloc_quantity, "reserved": Decimal("0")},
             )
             if not created:
-                target_balance.on_hand = total_on_hand
-                target_balance.reserved = total_reserved
-                target_balance.save(update_fields=["on_hand", "reserved", "updated_at"])
+                target_balance.on_hand = alloc_quantity
+                target_balance.save(update_fields=["on_hand", "updated_at"])
+
+            # Log the allocation as a stock movement for traceability
+            if alloc_quantity > 0:
+                InventoryMovement.objects.create(
+                    movement_type="IN",
+                    material=alloc_material,
+                    quantity=alloc_quantity,
+                    to_store=target_bin.store_location,
+                    to_bin=target_bin,
+                    reference_type="ALLOCATION",
+                    notes=alloc_notes or f"Allocated {alloc_quantity} × {alloc_material.name} to bin {target_bin.bin_code}",
+                    created_by=request.user,
+                )
+
             bin_label = " / ".join(filter(None, [target_bin.zone, target_bin.aisle, target_bin.rack, target_bin.shelf, target_bin.bin_code]))
-            if created and total_on_hand == 0:
-                messages.success(request, f"{alloc_material.name} allocated to {bin_label}. No stock yet — use Stock In to add quantity.")
-            else:
-                messages.success(request, f"{alloc_material.name} allocated to {bin_label}.")
+            qty_label = f" ({alloc_quantity} {alloc_material.unit or 'units'})" if alloc_quantity else " (no stock yet — add via Stock In)"
+            messages.success(request, f"{alloc_material.name} allocated to {bin_label}{qty_label}.")
             return redirect("warehouse_manage", pk=warehouse.pk)
 
     # Materials summary — aggregate per material across all bins in this warehouse,
