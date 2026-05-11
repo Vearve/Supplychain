@@ -4,6 +4,48 @@
 {% block page_title %}{{ title }}{% endblock %}
 
 {% block content %}
+<style>
+.sc-select-wrap { position: relative; display: block; }
+.sc-select-wrap input.sc-search {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 6px 28px 6px 8px;
+    border: 1px solid var(--border, #c8d4e0);
+    border-radius: 6px;
+    background: var(--bg-card, #fff);
+    color: var(--text, #1a2433);
+    font-size: 0.9rem;
+    cursor: text;
+}
+.sc-select-wrap input.sc-search:focus { outline: 2px solid var(--brand, #2a7adc); border-color: var(--brand, #2a7adc); }
+.sc-select-wrap .sc-arrow {
+    position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+    pointer-events: none; color: var(--text-muted, #6b7a8d); font-size: 0.75rem;
+}
+.sc-dropdown {
+    position: absolute; z-index: 9999; top: 100%; left: 0; right: 0;
+    max-height: 220px; overflow-y: auto;
+    background: var(--bg-card, #fff);
+    border: 1px solid var(--border, #c8d4e0);
+    border-radius: 6px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.13);
+    margin-top: 2px;
+    display: none;
+}
+.sc-dropdown.open { display: block; }
+.sc-dropdown .sc-option {
+    padding: 7px 10px;
+    font-size: 0.88rem;
+    cursor: pointer;
+    color: var(--text, #1a2433);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.sc-dropdown .sc-option:hover,
+.sc-dropdown .sc-option.sc-focused { background: var(--brand, #2a7adc); color: #fff; }
+.sc-dropdown .sc-no-results { padding: 7px 10px; font-size: 0.87rem; color: var(--text-muted, #6b7a8d); }
+</style>
 <div class="panel panel-pad" style="max-width: 980px; margin-bottom: 12px;">
     <form method="post" enctype="multipart/form-data" id="delivery-note-form">
         {% csrf_token %}
@@ -153,6 +195,131 @@
 {% block scripts %}
 <script>
 (function () {
+    /* ── Searchable select ── */
+    function makeSearchable(selectEl) {
+        if (!selectEl || selectEl.dataset.scDone) return;
+        selectEl.dataset.scDone = '1';
+        selectEl.style.display = 'none';
+
+        const wrap = document.createElement('div');
+        wrap.className = 'sc-select-wrap';
+
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'sc-search';
+        input.autocomplete = 'off';
+        input.placeholder = 'Type to search material…';
+
+        const arrow = document.createElement('span');
+        arrow.className = 'sc-arrow';
+        arrow.textContent = '▾';
+
+        const dropdown = document.createElement('div');
+        dropdown.className = 'sc-dropdown';
+
+        selectEl.parentNode.insertBefore(wrap, selectEl);
+        wrap.appendChild(input);
+        wrap.appendChild(arrow);
+        wrap.appendChild(dropdown);
+        wrap.appendChild(selectEl);
+
+        // Collect options once
+        const options = Array.from(selectEl.options)
+            .filter(o => o.value !== '')
+            .map(o => ({ value: o.value, label: o.text }));
+
+        // Set initial display text if a value is already selected
+        if (selectEl.value) {
+            const sel = options.find(o => o.value === selectEl.value);
+            if (sel) input.value = sel.label;
+        }
+
+        let focusedIdx = -1;
+
+        function buildList(query) {
+            dropdown.innerHTML = '';
+            focusedIdx = -1;
+            const q = query.toLowerCase().trim();
+            const filtered = q ? options.filter(o => o.label.toLowerCase().includes(q)) : options;
+            if (!filtered.length) {
+                const msg = document.createElement('div');
+                msg.className = 'sc-no-results';
+                msg.textContent = 'No results';
+                dropdown.appendChild(msg);
+                return;
+            }
+            filtered.forEach((opt, i) => {
+                const div = document.createElement('div');
+                div.className = 'sc-option';
+                div.textContent = opt.label;
+                div.dataset.value = opt.value;
+                div.addEventListener('mousedown', function (e) {
+                    e.preventDefault();
+                    selectOption(opt);
+                });
+                dropdown.appendChild(div);
+            });
+        }
+
+        function selectOption(opt) {
+            input.value = opt.label;
+            selectEl.value = opt.value;
+            dropdown.classList.remove('open');
+        }
+
+        function open() {
+            buildList(input.value);
+            dropdown.classList.add('open');
+        }
+
+        function close() { dropdown.classList.remove('open'); }
+
+        input.addEventListener('focus', () => open());
+        input.addEventListener('input', () => { open(); });
+
+        input.addEventListener('keydown', function (e) {
+            const items = dropdown.querySelectorAll('.sc-option');
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                focusedIdx = Math.min(focusedIdx + 1, items.length - 1);
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                focusedIdx = Math.max(focusedIdx - 1, 0);
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                if (focusedIdx >= 0 && items[focusedIdx]) items[focusedIdx].dispatchEvent(new Event('mousedown'));
+                return;
+            } else if (e.key === 'Escape') {
+                close(); return;
+            }
+            items.forEach((el, i) => el.classList.toggle('sc-focused', i === focusedIdx));
+            if (items[focusedIdx]) items[focusedIdx].scrollIntoView({ block: 'nearest' });
+        });
+
+        input.addEventListener('blur', function () {
+            // Delay so mousedown on option fires first
+            setTimeout(function () {
+                close();
+                // If text doesn't match a valid option, clear selection
+                const q = input.value.toLowerCase().trim();
+                const match = options.find(o => o.label.toLowerCase() === q);
+                if (match) {
+                    selectEl.value = match.value;
+                } else if (!q) {
+                    selectEl.value = '';
+                } else {
+                    // revert to last valid
+                    const current = options.find(o => o.value === selectEl.value);
+                    input.value = current ? current.label : '';
+                }
+            }, 150);
+        });
+    }
+
+    /* ── Init existing rows ── */
+    document.querySelectorAll('select[id^="id_items-"][id$="-material"]').forEach(makeSearchable);
+
+    /* ── Add row + init searchable ── */
     const totalForms = document.getElementById('id_items-TOTAL_FORMS');
     const tbody = document.querySelector('#items-table tbody');
     const addBtn = document.getElementById('add-item-btn');
@@ -160,7 +327,7 @@
 
     const emptyMaterial = document.getElementById('id_items-0-material');
     const emptyQuantity = document.getElementById('id_items-0-quantity');
-    const emptyDelete = document.getElementById('id_items-0-DELETE');
+    const emptyDelete   = document.getElementById('id_items-0-DELETE');
 
     addBtn.addEventListener('click', function () {
         const index = parseInt(totalForms.value, 10);
@@ -169,29 +336,31 @@
 
         const materialCell = document.createElement('td');
         const material = emptyMaterial.cloneNode(true);
-        material.name = `items-${index}-material`;
-        material.id = `id_items-${index}-material`;
+        material.name  = `items-${index}-material`;
+        material.id    = `id_items-${index}-material`;
         material.value = '';
+        delete material.dataset.scDone;   // allow re-init
+        material.style.display = '';      // reset hidden flag from clone
         materialCell.appendChild(material);
 
         const quantityCell = document.createElement('td');
         const quantity = emptyQuantity.cloneNode(true);
-        quantity.name = `items-${index}-quantity`;
-        quantity.id = `id_items-${index}-quantity`;
+        quantity.name  = `items-${index}-quantity`;
+        quantity.id    = `id_items-${index}-quantity`;
         quantity.value = '';
         quantityCell.appendChild(quantity);
 
         const deleteCell = document.createElement('td');
-        const del = emptyDelete.cloneNode(true);
-        del.name = `items-${index}-DELETE`;
-        del.id = `id_items-${index}-DELETE`;
+        const del  = emptyDelete.cloneNode(true);
+        del.name   = `items-${index}-DELETE`;
+        del.id     = `id_items-${index}-DELETE`;
         del.checked = false;
         deleteCell.appendChild(del);
 
         const idHidden = document.createElement('input');
-        idHidden.type = 'hidden';
-        idHidden.name = `items-${index}-id`;
-        idHidden.id = `id_items-${index}-id`;
+        idHidden.type  = 'hidden';
+        idHidden.name  = `items-${index}-id`;
+        idHidden.id    = `id_items-${index}-id`;
         idHidden.value = '';
         materialCell.appendChild(idHidden);
 
@@ -199,8 +368,10 @@
         row.appendChild(quantityCell);
         row.appendChild(deleteCell);
         tbody.appendChild(row);
-
         totalForms.value = String(index + 1);
+
+        // Init searchable on the new row's select
+        makeSearchable(material);
     });
 })();
 </script>
